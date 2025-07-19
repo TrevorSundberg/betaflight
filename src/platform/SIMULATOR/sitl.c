@@ -70,7 +70,9 @@
 #include "io/gps.h"
 #include "io/gps_virtual.h"
 
+/*
 #include <pthread.h>
+*/
 
 /*
 #include "dyad.h"

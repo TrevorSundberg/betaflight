@@ -46,6 +46,7 @@ add_library(betaflight_SITL SHARED
   src/main/common/sensor_alignment.c
   src/main/common/streambuf.c
   src/main/common/time.c
+  src/main/common/utils.c
   src/main/common/typeconversion.c
   src/main/common/vector.c
   src/main/config/config_eeprom.c

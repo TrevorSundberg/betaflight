@@ -29,7 +29,16 @@
 
 #define TARGET_BOARD_IDENTIFIER "SITL"
 
+/*
 #define SIMULATOR_MULTITHREAD
+*/
+#define pthread_mutex_lock(x)
+#define pthread_mutex_unlock(x)
+#define pthread_mutex_trylock(x) 0
+#define pthread_mutex_init(x, y) 0
+#ifdef _WIN32
+#define pthread_mutex_t int
+#endif
 
 #define SYSTEM_HSE_MHZ 0
 #define DEFAULT_CPU_OVERCLOCK 1

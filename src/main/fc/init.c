@@ -263,7 +263,6 @@ static void sdCardAndFSInit(void)
 }
 #endif
 
-PLUGIN_EXPORT
 void init(void)
 {
 #ifdef USE_FLUSH_IO

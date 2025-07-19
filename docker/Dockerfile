@@ -7,10 +7,15 @@ RUN apt-get update && apt-get install -y \
     cmake \
     gnupg \
     lsb-release \
+    mingw-w64 \
     ninja-build \
     software-properties-common \
     wget
 
 RUN wget -qO- https://apt.llvm.org/llvm.sh | bash -s -- 20 && \
     cp /usr/bin/clang-20 /usr/bin/clang && \
-    cp /usr/bin/clang-20 /usr/bin/clang++
+    cp /usr/bin/clang-20 /usr/bin/clang++ && \
+    cp /usr/bin/lld-20 /usr/bin/lld && \
+    cp /usr/bin/lld-link-20 /usr/bin/lld-link
+
+FROM linux AS windows

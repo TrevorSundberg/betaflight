@@ -130,4 +130,13 @@ void * memcpy_fn ( void * destination, const void * source, size_t num ) asm("me
 #define FALLTHROUGH do {} while(0)
 #endif
 
-#define PLUGIN_EXPORT __attribute__((visibility("default")))
+#if defined(_WIN32)
+# define PLUGIN_EXPORT __declspec(dllexport)
+int ffs(int i);
+char *strsep(char **restrict stringp, const char *restrict delim);
+char *strcasestr(const char *haystack, const char *needle);
+struct timespec;
+int nanosleep(const struct timespec *duration, struct timespec * rem);
+#else
+# define PLUGIN_EXPORT __attribute__((visibility("default")))
+#endif

@@ -31,4 +31,5 @@ typedef enum {
 
 extern uint8_t systemState;
 
+PLUGIN_EXPORT
 void init(void);
