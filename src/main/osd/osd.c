@@ -513,6 +513,8 @@ static void osdCompleteInitialization(void)
 #endif
 
     resumeRefreshAt = micros() + (4 * REFRESH_1S);
+    // Reduce the time to keep the logo up since we shortened calibration in SITL
+    resumeRefreshAt -= (5 * REFRESH_1S) / 2;
 #ifdef USE_OSD_PROFILES
     setOsdProfile(osdConfig()->osdProfileIndex);
 #endif
@@ -1380,7 +1382,7 @@ bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 }
 
 // Called when there is OSD update work to be done
-void osdUpdate(timeUs_t currentTimeUs)
+void osdUpdateOriginal(timeUs_t currentTimeUs)
 {
     static uint16_t osdStateDurationFractionUs[OSD_STATE_COUNT] = { 0 };
     static uint32_t osdElementDurationFractionUs[OSD_ITEM_COUNT] = { 0 };
@@ -1633,6 +1635,16 @@ void osdUpdate(timeUs_t currentTimeUs)
         schedulerSetNextStateTime((osdElementDurationFractionUs[osdGetActiveElement()] >> OSD_EXEC_TIME_SHIFT) + OSD_ELEMENT_MARGIN);
     } else {
         schedulerSetNextStateTime((osdStateDurationFractionUs[osdState] >> OSD_EXEC_TIME_SHIFT) + OSD_TASK_MARGIN);
+    }
+}
+
+void osdUpdate(timeUs_t currentTimeUs) {
+    // TODO(trevor): The OSD task is getting skipped often and runs at around 5HZ, even if we change:
+    // OSD_FRAMERATE_MIN_HZ = OSD_FRAMERATE_MAX_HZ = OSD_FRAMERATE_DEFAULT_HZ = 60
+    // Note that we have set the OSD task priority in tasks.c to TASK_PRIORITY_HIGH
+    // Need to spend a bit of time debugging the scheduler, but for now this works
+    for (int i = 0; i < 60; ++i) {
+        osdUpdateOriginal(currentTimeUs + i);
     }
 }
 

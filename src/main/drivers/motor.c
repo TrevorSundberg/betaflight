@@ -264,7 +264,11 @@ bool isMotorProtocolDshot(void)
 
 bool isMotorProtocolBidirDshot(void)
 {
+#ifdef USE_DSHOT
     return isMotorProtocolDshot() && useDshotTelemetry;
+#else
+    return false;
+#endif
 }
 
 void motorNullDevInit(motorDevice_t *device);

@@ -129,3 +129,5 @@ void * memcpy_fn ( void * destination, const void * source, size_t num ) asm("me
 #else
 #define FALLTHROUGH do {} while(0)
 #endif
+
+#define PLUGIN_EXPORT __attribute__((visibility("default")))

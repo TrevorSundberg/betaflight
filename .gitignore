@@ -23,6 +23,9 @@ README.pdf
 /downloads/
 /tools/
 /build/
+/build_linux/
+/build_wasi/
+/physics/physics_copy.c
 # local changes only
 mk/local.mk
 
@@ -48,7 +51,6 @@ stm32.mak
 
 # artefacts for CLion
 /cmake-build-debug/
-/CMakeLists.txt
 
 .vagrant
 ubuntu*.log

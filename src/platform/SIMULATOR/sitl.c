@@ -37,7 +37,9 @@
 #include "drivers/dma.h"
 #include "drivers/motor_impl.h"
 #include "drivers/serial.h"
+/*
 #include "drivers/serial_tcp.h"
+*/
 #include "drivers/system.h"
 #include "drivers/time.h"
 #include "drivers/pwm_output.h"
@@ -68,12 +70,18 @@
 #include "io/gps.h"
 #include "io/gps_virtual.h"
 
+#include <pthread.h>
+
+/*
 #include "dyad.h"
 #include "udplink.h"
+*/
 
 uint32_t SystemCoreClock;
 
+/*
 static fdm_packet fdmPkt;
+*/
 static rc_packet rcPkt;
 static servo_packet pwmPkt;
 static servo_packet_raw pwmRawPkt;
@@ -83,9 +91,13 @@ static bool fdm_received = false;
 
 static struct timespec start_time;
 static double simRate = 1.0;
+/*
 static pthread_t tcpWorker, udpWorker, udpWorkerRC;
+*/
 static bool workerRunning = true;
+/*
 static udpLink_t stateLink, pwmLink, pwmRawLink, rcLink;
+*/
 static pthread_mutex_t updateLock;
 static pthread_mutex_t mainLoopLock;
 static char simulator_ip[32] = "127.0.0.1";
@@ -94,6 +106,31 @@ static char simulator_ip[32] = "127.0.0.1";
 #define PORT_PWM        9002    // Out
 #define PORT_STATE      9003    // In
 #define PORT_RC         9004    // In
+
+typedef void (*motor_callback)(const servo_packet* packet);
+motor_callback motorCallback = NULL;;
+PLUGIN_EXPORT void setMotorCallback(motor_callback callback) {
+    motorCallback = callback;
+}
+
+// The reboot_kind is either a value from bootloaderRequestType_e, or -1 for normal reboot
+typedef void (*reboot_callback)(int32_t reboot_kind);
+reboot_callback rebootCallback = NULL;;
+PLUGIN_EXPORT void setRebootCallback(reboot_callback callback) {
+    rebootCallback = callback;
+}
+
+typedef void (*data_callback)(uint8_t* bytes, const uint32_t size);
+
+data_callback loadCallback = NULL;;
+PLUGIN_EXPORT void setLoadCallback(data_callback callback) {
+    loadCallback = callback;
+}
+
+data_callback saveCallback = NULL;;
+PLUGIN_EXPORT void setSaveCallback(data_callback callback) {
+    saveCallback = callback;
+}
 
 int targetParseArgs(int argc, char * argv[])
 {
@@ -120,11 +157,21 @@ int lockMainPID(void)
 
 static void sendMotorUpdate(void)
 {
+    if (motorCallback) {
+        motorCallback(&pwmPkt);
+    }
+/*
     udpSend(&pwmLink, &pwmPkt, sizeof(servo_packet));
+*/
 }
 
-static void updateState(const fdm_packet* pkt)
+PLUGIN_EXPORT void updateState(const fdm_packet* pkt)
 {
+    if (!fdm_received) {
+        printf("[SITL] new fdm t:%f\n", pkt->timestamp);
+        fdm_received = true;
+    }
+
     static double last_timestamp = 0; // in seconds
     static uint64_t last_realtime = 0; // in uS
     static struct timespec last_ts; // last packet
@@ -230,6 +277,7 @@ static void updateState(const fdm_packet* pkt)
 #endif
 }
 
+/*
 static void* udpThread(void* data)
 {
     UNUSED(data);
@@ -249,6 +297,7 @@ static void* udpThread(void* data)
     printf("udpThread end!!\n");
     return NULL;
 }
+*/
 
 static float readRCSITL(const rxRuntimeState_t *rxRuntimeState, uint8_t channel)
 {
@@ -262,6 +311,7 @@ static uint8_t rxRCFrameStatus(rxRuntimeState_t *rxRuntimeState)
     return RX_FRAME_COMPLETE;
 }
 
+/*
 static void *udpRCThread(void *data)
 {
     UNUSED(data);
@@ -289,6 +339,27 @@ static void *udpRCThread(void *data)
     return NULL;
 }
 
+*/
+
+PLUGIN_EXPORT void updateRCInput(const rc_packet* data)
+{
+    memcpy(&rcPkt, data, sizeof(rc_packet));
+
+    if (!rc_received) {
+        printf("[SITL] new rc t:%f AETR: %d %d %d %d AUX1-4: %d %d %d %d\n", rcPkt.timestamp,
+            rcPkt.channels[0], rcPkt.channels[1],rcPkt.channels[2],rcPkt.channels[3],
+            rcPkt.channels[4], rcPkt.channels[5],rcPkt.channels[6],rcPkt.channels[7]);
+
+        rxRuntimeState.channelCount = SIMULATOR_MAX_RC_CHANNELS;
+        rxRuntimeState.rcReadRawFn = readRCSITL;
+        rxRuntimeState.rcFrameStatusFn = rxRCFrameStatus;
+
+        rxRuntimeState.rxProvider = RX_PROVIDER_UDP;
+        rc_received = true;
+    }
+}
+
+/*
 static void* tcpThread(void* data)
 {
     UNUSED(data);
@@ -305,6 +376,7 @@ static void* tcpThread(void* data)
     printf("tcpThread end!!\n");
     return NULL;
 }
+*/
 
 // system
 void systemInit(void)
@@ -326,6 +398,8 @@ void systemInit(void)
         exit(1);
     }
 
+    (void)ret;
+/*
     ret = pthread_create(&tcpWorker, NULL, tcpThread, NULL);
     if (ret != 0) {
         printf("Create tcpWorker error!\n");
@@ -355,18 +429,29 @@ void systemInit(void)
         printf("Create udpRCThread error!\n");
         exit(1);
     }
+*/
 }
 
 void systemReset(void)
 {
+    if (rebootCallback) {
+        rebootCallback(-1);
+    }
+    /*
     printf("[system]Reset!\n");
     workerRunning = false;
     pthread_join(tcpWorker, NULL);
     pthread_join(udpWorker, NULL);
     exit(0);
+    */
 }
 void systemResetToBootloader(bootloaderRequestType_e requestType)
 {
+    if (rebootCallback) {
+        rebootCallback((int32_t)requestType);
+    }
+    /*
+    printf("[system]ResetToBootloader!\n");
     UNUSED(requestType);
 
     printf("[system]ResetToBootloader!\n");
@@ -374,6 +459,7 @@ void systemResetToBootloader(bootloaderRequestType_e requestType)
     pthread_join(tcpWorker, NULL);
     pthread_join(udpWorker, NULL);
     exit(0);
+    */
 }
 
 void timerInit(void)
@@ -604,9 +690,12 @@ static void pwmCompleteMotorUpdate(void)
 
     // get one "fdm_packet" can only send one "servo_packet"!!
     if (pthread_mutex_trylock(&updateLock) != 0) return;
+    sendMotorUpdate();
+/*
     udpSend(&pwmLink, &pwmPkt, sizeof(servo_packet));
 //    printf("[pwm]%u:%u,%u,%u,%u\n", idlePulse, motorsPwm[0], motorsPwm[1], motorsPwm[2], motorsPwm[3]);
     udpSend(&pwmRawLink, &pwmRawPkt, sizeof(servo_packet_raw));
+*/
 }
 
 void pwmWriteServo(uint8_t index, float value)
@@ -669,11 +758,18 @@ uint16_t adcGetChannel(uint8_t channel)
 char _estack;
 char _Min_Stack_Size;
 
+/*
 // virtual EEPROM
 static FILE *eepromFd = NULL;
+*/
 
 bool loadEEPROMFromFile(void)
 {
+    if (!loadCallback) {
+        return false;
+    }
+    loadCallback(eepromData, sizeof(eepromData));
+/*
     if (eepromFd != NULL) {
         fprintf(stderr, "[FLASH_Unlock] eepromFd != NULL\n");
         return false;
@@ -706,6 +802,7 @@ bool loadEEPROMFromFile(void)
             return false;
         }
     }
+*/
     return true;
 }
 
@@ -716,6 +813,10 @@ void configUnlock(void)
 
 void configLock(void)
 {
+    if (saveCallback) {
+        saveCallback(eepromData, sizeof(eepromData));
+    }
+/*
     // flush & close
     if (eepromFd != NULL) {
         fseek(eepromFd, 0, SEEK_SET);
@@ -726,6 +827,7 @@ void configLock(void)
     } else {
         fprintf(stderr, "[FLASH_Lock] eeprom is not unlocked\n");
     }
+*/
 }
 
 configStreamerResult_e configWriteWord(uintptr_t address, config_streamer_buffer_type_t *buffer)

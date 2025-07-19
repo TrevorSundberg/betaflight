@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "platform.h"
 
@@ -262,8 +263,15 @@ static void sdCardAndFSInit(void)
 }
 #endif
 
+PLUGIN_EXPORT
 void init(void)
 {
+#ifdef USE_FLUSH_IO
+    FILE* err = freopen("stdout.log", "w", stdout);
+    FILE* out = freopen("stderr.log", "w", stderr);
+    (void)err;
+    (void)out;
+#endif
 #if SERIAL_PORT_COUNT > 0
     printfSerialInit();
 #endif

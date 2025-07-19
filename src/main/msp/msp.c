@@ -395,9 +395,10 @@ static void mspRebootFn(serialPort_t *serialPort)
 
         return;
     }
-
+/*
     // control should never return here.
     while (true) ;
+*/
 }
 
 #define MSP_DISPATCH_DELAY_US 1000000
@@ -951,6 +952,11 @@ static bool mspCommonProcessOutCommand(int16_t cmdMSP, sbuf_t *dst, mspPostProce
         uint8_t osdFlags = 0;
 
         osdFlags |= OSD_FLAGS_OSD_FEATURE;
+        // Even though we're using MSP, trick the configurator
+        // into allowing the font configuration since we support it
+        osdFlags |= OSD_FLAGS_OSD_HARDWARE_MAX_7456;
+        osdFlags |= OSD_FLAGS_OSD_DEVICE_DETECTED;
+        osdFlags |= OSD_FLAGS_OSD_MSP_DEVICE;
 
         osdDisplayPortDevice_e deviceType;
         displayPort_t *osdDisplayPort = osdGetDisplayPort(&deviceType);

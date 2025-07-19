@@ -34,6 +34,13 @@
 
 void uli2a(unsigned long int num, unsigned int base, int uc, char *bf)
 {
+    // This crashes in WASM due to the while loop overruning
+    // Need to investigate further but for now just don't print long numbers
+    if (num != (unsigned int)num) {
+        *bf++ = '#';
+        *bf = 0;
+        return;
+    }
     unsigned int d = 1;
 
     while (num / d >= base)

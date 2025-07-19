@@ -154,4 +154,10 @@ bool virtualAccDetect(accDev_t *acc)
     acc->revisionCode = 0;
     return true;
 }
+uint8_t mpuGyroReadRegister(const extDevice_t *dev, uint8_t reg)
+{
+    (void)dev;
+    (void)reg;
+    return 0;
+}
 #endif // USE_VIRTUAL_ACC

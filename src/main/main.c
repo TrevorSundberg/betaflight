@@ -44,6 +44,11 @@ int main(int argc, char * argv[])
     return 0;
 }
 
+PLUGIN_EXPORT
+void iteration() {
+    scheduler();
+}
+
 void FAST_CODE run(void)
 {
     while (true) {

@@ -40,7 +40,10 @@
 #endif
 
 #if defined(SIMULATOR_BUILD)
+/*
 #include "drivers/serial_tcp.h"
+*/
+#include "drivers/serial_direct.h"
 #endif
 
 #include "drivers/light_led.h"
@@ -520,8 +523,11 @@ serialPort_t *openSerialPort(
     case SERIALTYPE_UART:
     case SERIALTYPE_LPUART:
 #if defined(SIMULATOR_BUILD)
+/*
         // emulate serial ports over TCP
         serialPort = serTcpOpen(identifier, rxCallback, rxCallbackData, baudRate, mode, options);
+*/
+        serialPort = serDirectOpen(identifier, rxCallback, rxCallbackData, baudRate, mode, options);
 #else
         serialPort = uartOpen(identifier, rxCallback, rxCallbackData, baudRate, mode, options);
 #endif

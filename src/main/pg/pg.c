@@ -29,6 +29,14 @@
 
 #include "pg.h"
 
+#ifdef WASI
+#define PG_SIZE 2048
+const pgRegistry_t __pg_registry_start[PG_SIZE] = {0};
+const pgRegistry_t __pg_registry_end[PG_SIZE] = {0};
+const uint8_t __pg_resetdata_start[PG_SIZE] = {0};
+const uint8_t __pg_resetdata_end[PG_SIZE] = {0};
+#endif
+
 const pgRegistry_t* pgFind(pgn_t pgn)
 {
     PG_FOREACH(reg) {

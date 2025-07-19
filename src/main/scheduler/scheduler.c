@@ -25,6 +25,7 @@
 #include <string.h>
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "platform.h"
 
@@ -485,6 +486,10 @@ static void readSchedulerLocals(task_t *selectedTask, uint8_t selectedTaskDynami
 
 FAST_CODE void scheduler(void)
 {
+#ifdef USE_FLUSH_IO
+    fflush(stdout);
+    fflush(stderr);
+#endif
     static uint32_t checkCycles = 0;
     static uint32_t scheduleCount = 0;
 #if defined(USE_LATE_TASK_STATISTICS)

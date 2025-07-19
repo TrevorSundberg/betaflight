@@ -11,4 +11,4 @@ TARGET_SRC = \
             blackbox/blackbox_virtual.c
 
 SIZE_OPTIMISED_SRC += \
-            drivers/serial_tcp.c
+            drivers/serial_direct.c

@@ -87,6 +87,22 @@ static int clearScreen(displayPort_t *displayPort, displayClearOption_e options)
     return output(displayPort, MSP_DISPLAYPORT, subcmd, sizeof(subcmd));
 }
 
+static bool writeFontCharacter(displayPort_t *displayPort, uint16_t addr, const osdCharacter_t *chr)
+{
+  // Only support 8 bit addresses
+  if (addr <= 255) {
+    uint8_t subcmd[OSD_CHAR_VISIBLE_BYTES + 1];
+    subcmd[0] = (uint8_t)addr;
+    memcpy(subcmd + 1, chr->data, OSD_CHAR_VISIBLE_BYTES);
+
+    // Only send the visible bytes as we do not use the metadata, and we would have
+    // to encode a different packet structure for that (see MSP_OSD_CHAR_WRITE)
+    output(displayPort, MSP_OSD_CHAR_WRITE, subcmd, OSD_CHAR_VISIBLE_BYTES + 1);
+    return true;
+  }
+  return false;
+}
+
 static bool drawScreen(displayPort_t *displayPort)
 {
     uint8_t subcmd[] = { MSP_DP_DRAW_SCREEN };
@@ -185,6 +201,7 @@ static const displayPortVTable_t mspDisplayPortVTable = {
     .layerSupported = NULL,
     .layerSelect = NULL,
     .layerCopy = NULL,
+    .writeFontCharacter = writeFontCharacter,
 };
 
 displayPort_t *displayPortMspInit(void)

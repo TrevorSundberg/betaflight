@@ -167,7 +167,8 @@ void pgResetFn_barometerConfig(barometerConfig_t *barometerConfig)
     barometerConfig->baro_xclr_tag = IO_TAG(BARO_XCLR_PIN);
 }
 
-#define NUM_CALIBRATION_CYCLES   100        // 10 seconds init_delay + 100 * 25 ms = 12.5 seconds before valid baro altitude
+// Reduce the number of barometer calibration cycles in SITL
+#define NUM_CALIBRATION_CYCLES   10        // 10 seconds init_delay + 100 * 25 ms = 12.5 seconds before valid baro altitude
 #define NUM_GROUND_LEVEL_CYCLES   10        // calibrate baro to new ground level (10 * 25 ms = ~250 ms non blocking)
 
 static uint16_t calibrationCycles = 0;      // baro calibration = get new ground pressure value
