@@ -3,8 +3,8 @@ project(betaflight LANGUAGES C CXX VERSION 1)
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fenable-matrix -fstack-protector-all -fno-optimize-sibling-calls -fno-omit-frame-pointer")
-set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fenable-matrix -fstack-protector-all -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fenable-matrix")
+set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fenable-matrix")
 
 set(CMAKE_SIZEOF_VOID_P 8)  # Enforces 64-bit pointer size
 
@@ -166,7 +166,6 @@ target_compile_definitions(betaflight_SITL PUBLIC
   USE_VTX_MSP=
   USE_VTX_COMMON=
   USE_VTX_CONTROL=
-  USE_FLUSH_IO=
   USE_BLACKBOX=
   USE_CMS= # Needed for OSD, some lines check for this and OSD over MSP
   _GNU_SOURCE
@@ -184,6 +183,18 @@ target_compile_options(betaflight_SITL PRIVATE
   -Wno-unknown-pragmas
   -Wno-incompatible-pointer-types
 )
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message(STATUS "Configuring for a DEBUG build")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstack-protector-all -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fstack-protector-all -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+  target_compile_definitions(betaflight_SITL PUBLIC
+    USE_FLUSH_IO=
+  )
+else()
+  message(STATUS "Configuring for a RELEASE build")
+endif()
+
 set_property(TARGET betaflight_SITL PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_compile_features(betaflight_SITL PUBLIC cxx_std_17)
 
