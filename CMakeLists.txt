@@ -186,8 +186,8 @@ target_compile_options(betaflight_SITL PRIVATE
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message(STATUS "Configuring for a DEBUG build")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstack-protector-all -fno-optimize-sibling-calls -fno-omit-frame-pointer")
-  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fstack-protector-all -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer")
   target_compile_definitions(betaflight_SITL PUBLIC
     USE_FLUSH_IO=
   )

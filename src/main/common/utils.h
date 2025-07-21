@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 
 #define NOOP do {} while (0)
 
@@ -135,7 +136,6 @@ void * memcpy_fn ( void * destination, const void * source, size_t num ) asm("me
 int ffs(int i);
 char *strsep(char **restrict stringp, const char *restrict delim);
 char *strcasestr(const char *haystack, const char *needle);
-struct timespec;
 int nanosleep(const struct timespec *duration, struct timespec * rem);
 #else
 # define PLUGIN_EXPORT __attribute__((visibility("default")))
