@@ -120,7 +120,10 @@
 #undef USE_STACK_CHECK // I think SITL don't need this
 #undef USE_DASHBOARD
 #undef USE_TELEMETRY_LTM
+/*
 #undef USE_ADC
+*/
+#define ADC1                             ((ADC_TypeDef *) NULL)
 #undef USE_VCP
 /*
 #undef USE_OSD

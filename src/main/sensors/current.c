@@ -111,7 +111,8 @@ PG_REGISTER(currentSensorVirtualConfig_t, currentSensorVirtualConfig, PG_CURRENT
 
 static int32_t currentMeterADCToCentiamps(const uint16_t src)
 {
-
+    return (int32_t)src;
+/*
     const currentSensorADCConfig_t *config = currentSensorADCConfig();
 
     int32_t millivolts = ((uint32_t)src * getVrefMv()) / 4096;
@@ -122,6 +123,7 @@ static int32_t currentMeterADCToCentiamps(const uint16_t src)
     DEBUG_SET(DEBUG_CURRENT_SENSOR, 1, centiAmps);
 
     return centiAmps; // Returns Centiamps to maintain compatability with the rest of the code
+*/
 }
 
 #if defined(USE_ADC) || defined(USE_VIRTUAL_CURRENT_METER)

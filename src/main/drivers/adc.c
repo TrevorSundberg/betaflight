@@ -85,6 +85,7 @@ ADCDevice adcDeviceByInstance(const ADC_TypeDef *instance)
     return ADCINVALID;
 }
 
+/*
 uint16_t adcGetChannel(uint8_t channel)
 {
     adcGetChannelValues();
@@ -105,6 +106,7 @@ uint16_t adcGetChannel(uint8_t channel)
 #endif
     return adcValues[adcOperatingConfig[channel].dmaIndex];
 }
+*/
 
 // Verify a pin designated by tag has connection to an ADC instance designated by device
 

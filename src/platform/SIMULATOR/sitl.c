@@ -63,6 +63,8 @@
 
 #include "pg/rx.h"
 #include "pg/motor.h"
+#include "pg/adc.h"
+#include "sensors/adcinternal.h"
 
 #include "rx/rx.h"
 #include "rx/spektrum.h"
@@ -753,8 +755,22 @@ bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig,
 uint16_t adcGetChannel(uint8_t channel)
 {
     UNUSED(channel);
+    switch (channel) {
+        case ADC_BATTERY: {
+            const float volts = 4.3f;
+            uint16_t centiVolts = (uint16_t)roundf(volts * 100);
+            return centiVolts;
+        }
+        case ADC_CURRENT: {
+            const float amps = 0.05f;
+            uint16_t centiAmps = (uint16_t)roundf(amps * 100);
+            return centiAmps;
+        }
+    }
     return 0;
 }
+void adcInit(const adcConfig_t *config) {}
+const adcTagMap_t adcTagMap[] = {};
 
 // stack part
 char _estack;

@@ -46,8 +46,8 @@ add_library(betaflight_SITL SHARED
   src/main/common/sensor_alignment.c
   src/main/common/streambuf.c
   src/main/common/time.c
-  src/main/common/utils.c
   src/main/common/typeconversion.c
+  src/main/common/utils.c
   src/main/common/vector.c
   src/main/config/config_eeprom.c
   src/main/config/config_streamer.c
@@ -56,6 +56,7 @@ add_library(betaflight_SITL SHARED
   src/main/config/simplified_tuning.c
   src/main/drivers/accgyro/accgyro_virtual.c
   src/main/drivers/accgyro/gyro_sync.c
+  src/main/drivers/adc.c
   src/main/drivers/barometer/barometer_virtual.c
   src/main/drivers/buf_writer.c
   src/main/drivers/bus.c
@@ -111,6 +112,7 @@ add_library(betaflight_SITL SHARED
   src/main/osd/osd_elements.c
   src/main/osd/osd_warnings.c
   src/main/osd/osd.c
+  src/main/pg/adc.c
   src/main/pg/autopilot_multirotor.c
   src/main/pg/board.c
   src/main/pg/displayport_profiles.c
@@ -167,6 +169,7 @@ target_compile_definitions(betaflight_SITL PUBLIC
   USE_VTX_COMMON=
   USE_VTX_CONTROL=
   USE_BLACKBOX=
+  USE_ADC=
   USE_CMS= # Needed for OSD, some lines check for this and OSD over MSP
   _GNU_SOURCE
   __TARGET__="SITL"
