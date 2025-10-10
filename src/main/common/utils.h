@@ -140,3 +140,10 @@ int nanosleep(const struct timespec *duration, struct timespec * rem);
 #else
 # define PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
+
+#if defined(USE_DETERMINISM)
+int nanosleep_override(const struct timespec *duration, struct timespec *rem);
+int clock_gettime_override(clockid_t clk_id, struct timespec *tp);
+#define nanosleep nanosleep_override
+#define clock_gettime clock_gettime_override
+#endif

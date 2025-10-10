@@ -44,9 +44,11 @@ int main(int argc, char * argv[])
     return 0;
 }
 
+uint64_t externalFrame = 0;
 PLUGIN_EXPORT
 void iteration() {
     scheduler();
+    ++externalFrame;
 }
 
 void FAST_CODE run(void)

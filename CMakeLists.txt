@@ -170,6 +170,7 @@ target_compile_definitions(betaflight_SITL PUBLIC
   USE_VTX_CONTROL=
   USE_BLACKBOX=
   USE_ADC=
+  USE_DETERMINISM=
   USE_CMS= # Needed for OSD, some lines check for this and OSD over MSP
   _GNU_SOURCE
   __TARGET__="SITL"

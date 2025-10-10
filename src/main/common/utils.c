@@ -1,6 +1,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "utils.h"
 
@@ -66,6 +69,7 @@ int ffs(int i)
     return pos;
 }
 
+#if !defined(USE_DETERMINISM)
 typedef int clockid_t;
 #define CLOCK_REALTIME                  0
 #define CLOCK_MONOTONIC                 1
@@ -177,3 +181,66 @@ int nanosleep(const struct timespec *duration, struct timespec * rem) {
     return 0;
 }
 #endif
+#endif
+
+#if defined(USE_DETERMINISM)
+// Keep in Sync with C# FlightController.SchedulerHZ
+#define SCHEDULER_HZ 16000ULL
+
+#define NS_PER_SEC 1000000000ULL
+#define NS_PER_US 1000ULL
+#define NS_PER_FRAME (NS_PER_SEC / SCHEDULER_HZ)
+#define MAX_CLOCK_SAMPLES_PER_FRAME 1000ULL
+#define NS_PER_CLOCK_GETTIME (NS_PER_FRAME / MAX_CLOCK_SAMPLES_PER_FRAME)
+
+extern uint64_t externalFrame;
+static uint64_t previousFrame = -1;
+static uint64_t nsThisFrame = 0;
+static uint64_t nsAdvance = 0;
+
+int nanosleep_override(const struct timespec *duration, struct timespec *rem) {
+    nsThisFrame += duration->tv_sec * NS_PER_SEC;
+    nsThisFrame += duration->tv_nsec;
+
+    if (rem) {
+        rem->tv_sec  = 0;
+        rem->tv_nsec = 0;
+    }
+    return 0;
+}
+
+uint64_t nsTotalLast = 0;
+int clock_gettime_override(clockid_t clk_id, struct timespec *tp) {
+    if (externalFrame == previousFrame) {
+        nsThisFrame += NS_PER_CLOCK_GETTIME;
+    } else {
+        uint32_t framesAdvanced = externalFrame - previousFrame;
+        previousFrame = externalFrame;
+
+        // If we went past the typical budget for a frame, such as when delaying/waiting
+        // then accumulate this advance in time by how much we went over
+        uint64_t nsFramesAdvanced = NS_PER_FRAME * framesAdvanced;
+        if (nsThisFrame > nsFramesAdvanced) {
+            nsAdvance += nsThisFrame - nsFramesAdvanced;
+        }
+
+        nsThisFrame = 0;
+    }
+
+    uint64_t nsTotal = (externalFrame * NS_PER_FRAME) + nsThisFrame + nsAdvance;
+
+    if (nsTotal < nsTotalLast)
+    {
+        printf("Total time went backwards %"PRIu64" %"PRIu64"\n", nsTotal, nsTotalLast);
+        fflush(stdout);
+        abort();
+    }
+
+    nsTotalLast = nsTotal;
+
+    tp->tv_sec = nsTotal / NS_PER_SEC;
+    tp->tv_nsec = nsTotal % NS_PER_SEC;
+    return 0;
+}
+#endif
+
