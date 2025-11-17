@@ -46,9 +46,11 @@ int main(int argc, char * argv[])
 
 uint64_t externalFrame = 0;
 void updateRCInput(const rc_packet* data);
+void updateState(const fdm_packet* pkt);
 PLUGIN_EXPORT
-void iteration(const rc_packet* data) {
+void iteration(const rc_packet* data, const fdm_packet* pkt) {
     updateRCInput(data);
+    updateState(pkt);
     scheduler();
     ++externalFrame;
 }

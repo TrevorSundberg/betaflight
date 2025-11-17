@@ -169,7 +169,7 @@ static void sendMotorUpdate(void)
 */
 }
 
-PLUGIN_EXPORT void updateState(const fdm_packet* pkt)
+void updateState(const fdm_packet* pkt)
 {
     if (!fdm_received) {
         printf("[SITL] new fdm t:%f\n", pkt->timestamp);
