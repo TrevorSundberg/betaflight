@@ -982,6 +982,3 @@ bool rcSmoothingInitializationComplete(void)
 }
 #endif // USE_RC_SMOOTHING_FILTER
 
-PLUGIN_EXPORT uint8_t getCameraAngleDegrees() {
-    return rxConfig()->fpvCamAngleDegrees;
-}
