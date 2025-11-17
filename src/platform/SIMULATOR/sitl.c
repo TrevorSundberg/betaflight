@@ -126,13 +126,6 @@ PLUGIN_EXPORT void setRebootCallback(reboot_callback callback) {
     rebootCallback = callback;
 }
 
-typedef void (*data_callback)(uint8_t* bytes, const uint32_t size);
-
-data_callback saveCallback = NULL;;
-PLUGIN_EXPORT void setSaveCallback(data_callback callback) {
-    saveCallback = callback;
-}
-
 int targetParseArgs(int argc, char * argv[])
 {
     //The first argument should be target IP.
@@ -780,12 +773,15 @@ static FILE *eepromFd = NULL;
 
 typedef struct {
     uint8_t cameraAngleDegrees;
+    uint8_t* eeprom;
+    uint32_t eepromSize;
 } iteration_output;
 
 uint64_t externalFrame = 0;
 void updateRCInput(const rc_packet* data);
 void updateState(const fdm_packet* pkt);
 uint8_t eepromInitialData[EEPROM_SIZE];
+bool saveEEPROM = false;
 PLUGIN_EXPORT void initialize(const void* eepromInData, const int eepromInSize) {
 #ifdef USE_FLUSH_IO
     FILE* err = freopen("stdout.log", "w", stdout);
@@ -808,6 +804,16 @@ PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, c
     }
     output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
     scheduler();
+
+    if (saveEEPROM) {
+        output->eepromSize = EEPROM_SIZE;
+        output->eeprom = eepromData;
+        saveEEPROM = false;
+    } else {
+        output->eepromSize = 0;
+        output->eeprom = NULL;
+    }
+
     ++externalFrame;
 }
 
@@ -858,9 +864,7 @@ void configUnlock(void)
 
 void configLock(void)
 {
-    if (saveCallback) {
-        saveCallback(eepromData, sizeof(eepromData));
-    }
+    saveEEPROM = true;
 /*
     // flush & close
     if (eepromFd != NULL) {
