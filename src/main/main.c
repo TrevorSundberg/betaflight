@@ -45,8 +45,10 @@ int main(int argc, char * argv[])
 }
 
 uint64_t externalFrame = 0;
+void updateRCInput(const rc_packet* data);
 PLUGIN_EXPORT
-void iteration() {
+void iteration(const rc_packet* data) {
+    updateRCInput(data);
     scheduler();
     ++externalFrame;
 }

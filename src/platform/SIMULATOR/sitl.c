@@ -345,7 +345,7 @@ static void *udpRCThread(void *data)
 
 */
 
-PLUGIN_EXPORT void updateRCInput(const rc_packet* data)
+void updateRCInput(const rc_packet* data)
 {
     memcpy(&rcPkt, data, sizeof(rc_packet));
 
