@@ -265,12 +265,6 @@ static void sdCardAndFSInit(void)
 
 void init(void)
 {
-#ifdef USE_FLUSH_IO
-    FILE* err = freopen("stdout.log", "w", stdout);
-    FILE* out = freopen("stderr.log", "w", stderr);
-    (void)err;
-    (void)out;
-#endif
 #if SERIAL_PORT_COUNT > 0
     printfSerialInit();
 #endif

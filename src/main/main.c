@@ -26,8 +26,6 @@
 #include "fc/init.h"
 
 #include "scheduler/scheduler.h"
-#include "drivers/serial_direct.h"
-#include "pg/rx.h"
 
 void run(void);
 
@@ -44,31 +42,6 @@ int main(int argc, char * argv[])
     run();
 
     return 0;
-}
-
-typedef struct {
-    uint8_t cameraAngleDegrees;
-} iteration_output;
-
-uint64_t externalFrame = 0;
-void updateRCInput(const rc_packet* data);
-void updateState(const fdm_packet* pkt);
-bool hasInit = false;
-PLUGIN_EXPORT
-void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size, uint8_t cameraAngle, iteration_output* output) {
-    if (!hasInit) {
-        init();
-        hasInit = true;
-    }
-    updateRCInput(rcpkt);
-    updateState(fdmpkt);
-    uartDataIn(0, data, size);
-    if (cameraAngle != (uint8_t)-1) {
-        rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
-    }
-    output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
-    scheduler();
-    ++externalFrame;
 }
 
 void FAST_CODE run(void)

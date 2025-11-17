@@ -71,6 +71,8 @@
 
 #include "io/gps.h"
 #include "io/gps_virtual.h"
+#include "fc/init.h"
+#include "drivers/serial_direct.h"
 
 /*
 #include <pthread.h>
@@ -125,11 +127,6 @@ PLUGIN_EXPORT void setRebootCallback(reboot_callback callback) {
 }
 
 typedef void (*data_callback)(uint8_t* bytes, const uint32_t size);
-
-data_callback loadCallback = NULL;;
-PLUGIN_EXPORT void setLoadCallback(data_callback callback) {
-    loadCallback = callback;
-}
 
 data_callback saveCallback = NULL;;
 PLUGIN_EXPORT void setSaveCallback(data_callback callback) {
@@ -781,12 +778,42 @@ char _Min_Stack_Size;
 static FILE *eepromFd = NULL;
 */
 
+typedef struct {
+    uint8_t cameraAngleDegrees;
+} iteration_output;
+
+uint64_t externalFrame = 0;
+void updateRCInput(const rc_packet* data);
+void updateState(const fdm_packet* pkt);
+uint8_t eepromInitialData[EEPROM_SIZE];
+PLUGIN_EXPORT void initialize(const void* eepromInData, const int eepromInSize) {
+#ifdef USE_FLUSH_IO
+    FILE* err = freopen("stdout.log", "w", stdout);
+    FILE* out = freopen("stderr.log", "w", stderr);
+    (void)err;
+    (void)out;
+#endif
+    if (eepromInSize == EEPROM_SIZE) {
+        memcpy(eepromInitialData, eepromInData, EEPROM_SIZE);
+    }
+    init();
+}
+
+PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size, uint8_t cameraAngle, iteration_output* output) {
+    updateRCInput(rcpkt);
+    updateState(fdmpkt);
+    uartDataIn(0, data, size);
+    if (cameraAngle != (uint8_t)-1) {
+        rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
+    }
+    output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
+    scheduler();
+    ++externalFrame;
+}
+
 bool loadEEPROMFromFile(void)
 {
-    if (!loadCallback) {
-        return false;
-    }
-    loadCallback(eepromData, sizeof(eepromData));
+    memcpy(eepromData, eepromInitialData, EEPROM_SIZE);
 /*
     if (eepromFd != NULL) {
         fprintf(stderr, "[FLASH_Unlock] eepromFd != NULL\n");
