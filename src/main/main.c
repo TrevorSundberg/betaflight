@@ -27,6 +27,7 @@
 
 #include "scheduler/scheduler.h"
 #include "drivers/serial_direct.h"
+#include "pg/rx.h"
 
 void run(void);
 
@@ -50,7 +51,7 @@ void updateRCInput(const rc_packet* data);
 void updateState(const fdm_packet* pkt);
 bool hasInit = false;
 PLUGIN_EXPORT
-void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size) {
+void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size, uint8_t cameraAngle) {
     if (!hasInit) {
         init();
         hasInit = true;
@@ -58,6 +59,9 @@ void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* dat
     updateRCInput(rcpkt);
     updateState(fdmpkt);
     uartDataIn(0, data, size);
+    if (cameraAngle != (uint8_t)-1) {
+        rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
+    }
     scheduler();
     ++externalFrame;
 }
