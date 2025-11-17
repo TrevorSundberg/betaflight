@@ -47,8 +47,13 @@ int main(int argc, char * argv[])
 uint64_t externalFrame = 0;
 void updateRCInput(const rc_packet* data);
 void updateState(const fdm_packet* pkt);
+bool hasInit = false;
 PLUGIN_EXPORT
 void iteration(const rc_packet* data, const fdm_packet* pkt) {
+    if (!hasInit) {
+        init();
+        hasInit = true;
+    }
     updateRCInput(data);
     updateState(pkt);
     scheduler();
