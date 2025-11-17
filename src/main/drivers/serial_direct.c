@@ -201,9 +201,9 @@ void directDataIn(directPort_t *s, uint8_t* ch, int size)
     }
 }
 
-PLUGIN_EXPORT void uartDataIn(int id, const void* data, const int size) {
+void uartDataIn(int id, const void* data, const int size) {
     if (id < 0 || id >= SERIAL_PORT_COUNT || !directPortInitialized[id]) {
-        return;
+        abort();
     }
     directDataIn(directSerialPorts + id, (uint8_t*)data, (int)size);
 }

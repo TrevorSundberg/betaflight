@@ -39,4 +39,4 @@ typedef void (*uartCreatedCallback)(int id);
 PLUGIN_EXPORT void setUartCreatedCallback(uartCreatedCallback callback);
 typedef void (*uartDataCallback)(int id, const void* data, const int size);
 PLUGIN_EXPORT void setUartDataCallback(uartDataCallback callback);
-PLUGIN_EXPORT void uartDataIn(int id, const void* data, const int size);
+void uartDataIn(int id, const void* data, const int size);
