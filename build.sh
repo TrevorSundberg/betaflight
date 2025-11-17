@@ -6,6 +6,7 @@ set -ex
 # TODO(trevor): Move physics.c into it's own build
 mkdir -p physics
 cp ../../src/physics.c physics/physics_copy.c
+cp ../../src/shared.h physics/shared.h
 #make OPTIONS=USE_GPS TARGET=SITL
 docker buildx build --progress=plain --target linux -t betaflight_linux ./docker
 docker buildx build --progress=plain --target wasi -t betaflight_wasi ./docker
