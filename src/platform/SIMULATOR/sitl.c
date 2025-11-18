@@ -118,13 +118,9 @@ motor_callback motorCallback = NULL;;
 PLUGIN_EXPORT void setMotorCallback(motor_callback callback) {
     motorCallback = callback;
 }
-
-// The reboot_kind is either a value from bootloaderRequestType_e, or -1 for normal reboot
-typedef void (*reboot_callback)(int32_t reboot_kind);
-reboot_callback rebootCallback = NULL;;
-PLUGIN_EXPORT void setRebootCallback(reboot_callback callback) {
-    rebootCallback = callback;
-}
+#define REBOOT_REQUEST_NORMAL ((bootloaderRequestType_e)-1)
+#define REBOOT_REQUEST_NONE ((bootloaderRequestType_e)-2)
+bootloaderRequestType_e rebootRequest = REBOOT_REQUEST_NONE;
 
 int targetParseArgs(int argc, char * argv[])
 {
@@ -428,9 +424,7 @@ void systemInit(void)
 
 void systemReset(void)
 {
-    if (rebootCallback) {
-        rebootCallback(-1);
-    }
+    rebootRequest = REBOOT_REQUEST_NORMAL;
     /*
     printf("[system]Reset!\n");
     workerRunning = false;
@@ -441,9 +435,7 @@ void systemReset(void)
 }
 void systemResetToBootloader(bootloaderRequestType_e requestType)
 {
-    if (rebootCallback) {
-        rebootCallback((int32_t)requestType);
-    }
+    rebootRequest = requestType;
     /*
     printf("[system]ResetToBootloader!\n");
     UNUSED(requestType);
@@ -775,7 +767,9 @@ typedef struct {
     uint8_t cameraAngleDegrees;
     uint8_t* eeprom;
     uint32_t eepromSize;
+    int32_t rebootRequest;
 } iteration_output;
+STATIC_ASSERT(sizeof(int32_t) == sizeof(bootloaderRequestType_e), "bootloaderRequestType_e must be int32_t sized");
 
 uint64_t externalFrame = 0;
 void updateRCInput(const rc_packet* data);
@@ -813,6 +807,9 @@ PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, c
         output->eepromSize = 0;
         output->eeprom = NULL;
     }
+
+    output->rebootRequest = (int32_t)rebootRequest;
+    rebootRequest = REBOOT_REQUEST_NONE;
 
     ++externalFrame;
 }
