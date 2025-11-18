@@ -35,8 +35,6 @@ typedef struct {
 
 serialPort_t *serDirectOpen(serialPortIdentifier_e id, serialReceiveCallbackPtr rxCallback, void *rxCallbackData, uint32_t baudRate, portMode_e mode, portOptions_e options);
 
-typedef void (*uartCreatedCallback)(int id);
-PLUGIN_EXPORT void setUartCreatedCallback(uartCreatedCallback callback);
 typedef void (*uartDataCallback)(int id, const void* data, const int size);
 PLUGIN_EXPORT void setUartDataCallback(uartDataCallback callback);
 void uartDataIn(int id, const void* data, const int size);

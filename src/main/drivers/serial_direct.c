@@ -44,12 +44,8 @@ static const struct serialPortVTable directVTable; // Forward
 static directPort_t directSerialPorts[SERIAL_PORT_COUNT];
 static bool directPortInitialized[SERIAL_PORT_COUNT];
 
-static uartCreatedCallback uartCreatedCall = NULL;
 static uartDataCallback uartDataCall = NULL;
 
-PLUGIN_EXPORT void setUartCreatedCallback(uartCreatedCallback callback) {
-    uartCreatedCall = callback;
-}
 PLUGIN_EXPORT void setUartDataCallback(uartDataCallback callback) {
     uartDataCall = callback;
 }
@@ -62,9 +58,6 @@ static directPort_t* directReconfigure(directPort_t *s, int id)
     }
 
     directPortInitialized[id] = true;
-    if (uartCreatedCall) {
-        uartCreatedCall(id);
-    }
     s->id = id;
     return s;
 }
