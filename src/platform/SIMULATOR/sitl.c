@@ -768,7 +768,7 @@ typedef struct {
     uint8_t* eeprom;
     uint32_t eepromSize;
     int32_t rebootRequest;
-} iteration_output;
+} iterationOutput;
 STATIC_ASSERT(sizeof(int32_t) == sizeof(bootloaderRequestType_e), "bootloaderRequestType_e must be int32_t sized");
 
 uint64_t externalFrame = 0;
@@ -789,7 +789,7 @@ PLUGIN_EXPORT void initialize(const void* eepromInData, const int eepromInSize) 
     init();
 }
 
-PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size, uint8_t cameraAngle, iteration_output* output) {
+PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size, uint8_t cameraAngle, iterationOutput* output) {
     updateRCInput(rcpkt);
     updateState(fdmpkt);
     uartDataIn(0, data, size);
