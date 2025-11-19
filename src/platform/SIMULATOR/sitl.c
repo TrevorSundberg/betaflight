@@ -762,7 +762,7 @@ typedef struct {
     uint8_t cameraAngleDegrees; // set to -1 to leave it as it is
     void* uartDataInConfigurator;
     int uartDataInSizeConfigurator;
-    uint16_t channels[SIMULATOR_MAX_RC_CHANNELS];   // RC channels
+    float channels[SIMULATOR_MAX_RC_CHANNELS]; // [-1, 1]
     double imu_angular_velocity_rpy[3]; // rad/s -> range: +/- 8192; +/- 2000 deg/se
     double imu_linear_acceleration_xyz[3];    // m/s/s NED, body frame -> sim 1G = 9.80665, FC 1G = 256
     double imu_orientation_quat[4];     //w, x, y, z
@@ -819,8 +819,14 @@ PLUGIN_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
 
     rc_packet rcpkt;
     rcpkt.timestamp = timestamp;
-    STATIC_ASSERT(sizeof(rcpkt.channels) == sizeof(input->channels), "channels size must match");
-    memcpy(rcpkt.channels, input->channels, sizeof(input->channels));
+    rxConfig_t* config = rxConfig();
+    for (int i = 0; i < SIMULATOR_MAX_RC_CHANNELS; ++i) {
+        float value = input->channels[i];
+        uint16_t pwm = value >= 0.0f
+            ? config->midrc + (uint16_t)((config->rx_max_usec - config->midrc) * value)
+            : config->rx_min_usec + (uint16_t)((config->midrc - config->rx_min_usec) * (1.0f + value));
+        rcpkt.channels[i] = pwm;
+    }
     updateRCInput(&rcpkt);
 
     // TODO(trevor): Apply Unity transforms here, assume kongrothflight is in 
