@@ -113,11 +113,6 @@ static char simulator_ip[32] = "127.0.0.1";
 #define PORT_STATE      9003    // In
 #define PORT_RC         9004    // In
 
-typedef void (*motor_callback)(const servo_packet* packet);
-motor_callback motorCallback = NULL;;
-PLUGIN_EXPORT void setMotorCallback(motor_callback callback) {
-    motorCallback = callback;
-}
 #define REBOOT_REQUEST_NORMAL ((bootloaderRequestType_e)-1)
 #define REBOOT_REQUEST_NONE ((bootloaderRequestType_e)-2)
 bootloaderRequestType_e rebootRequest = REBOOT_REQUEST_NONE;
@@ -147,9 +142,6 @@ int lockMainPID(void)
 
 static void sendMotorUpdate(void)
 {
-    if (motorCallback) {
-        motorCallback(&pwmPkt);
-    }
 /*
     udpSend(&pwmLink, &pwmPkt, sizeof(servo_packet));
 */
@@ -777,6 +769,7 @@ typedef struct {
     uint32_t eepromSize;
     int32_t rebootRequest;
     uartBufferOutput uartBuffers[UART_CHANNELS];
+    servo_packet motors;
 } iterationOutput;
 
 typedef struct {
@@ -835,6 +828,15 @@ PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, c
         dst->uartDataOut = src->uartDataOut;
         src->uartDataSize = 0;
     }
+
+    memcpy(&output->motors, &pwmPkt, sizeof(pwmPkt)); // pwmRawPkt for all motors
+    STATIC_ASSERT(sizeof(output->motors) == sizeof(pwmPkt), "size of motors packet must match");
+
+    // For when we want to do octocopters, etc, and get rid of our crazy motor mapping
+    //pwmPkt.motor_speed[3] = motorsPwm[0] / outScale;
+    //pwmPkt.motor_speed[0] = motorsPwm[1] / outScale;
+    //pwmPkt.motor_speed[1] = motorsPwm[2] / outScale;
+    //pwmPkt.motor_speed[2] = motorsPwm[3] / outScale;
 
     ++externalFrame;
 #ifdef USE_FLUSH_IO
