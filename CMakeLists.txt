@@ -8,8 +8,6 @@ set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fenable-matrix")
 
 set(CMAKE_SIZEOF_VOID_P 8)  # Enforces 64-bit pointer size
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")  # TEMPORARY WHILE DEBUGGING
-
 add_library(betaflight_SITL SHARED
   src/main/blackbox/blackbox_encoding.c
   src/main/blackbox/blackbox_io.c
@@ -190,8 +188,8 @@ target_compile_options(betaflight_SITL PRIVATE
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message(STATUS "Configuring for a DEBUG build")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer")
-  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O0")
+  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O0")
   target_compile_definitions(betaflight_SITL PUBLIC
     USE_FLUSH_IO=
   )
