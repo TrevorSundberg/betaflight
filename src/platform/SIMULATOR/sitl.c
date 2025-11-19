@@ -778,11 +778,12 @@ typedef struct {
 
 typedef struct {
     uint8_t cameraAngleDegrees;
+    uint8_t motorCount;
+    float motorSpeeds[SIMULATOR_MAX_PWM_CHANNELS];   // normal: [0.0, 1.0], 3D: [-1.0, 1.0]
     uint8_t* eeprom;
     uint32_t eepromSize;
     int32_t rebootRequest;
     uartBufferOutput uartBuffers[UART_CHANNELS];
-    servo_packet motors;
 } iterationOutput;
 
 typedef struct {
@@ -871,14 +872,15 @@ PLUGIN_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
         src->uartDataSize = 0;
     }
 
-    memcpy(&output->motors, &pwmPkt, sizeof(pwmPkt)); // pwmRawPkt for all motors
-    STATIC_ASSERT(sizeof(output->motors) == sizeof(pwmPkt), "size of motors packet must match");
+    double outScale = 1000.0;
+    if (featureIsEnabled(FEATURE_3D)) {
+        outScale = 500.0;
+    }
 
-    // For when we want to do octocopters, etc, and get rid of our crazy motor mapping
-    //pwmPkt.motor_speed[3] = motorsPwm[0] / outScale;
-    //pwmPkt.motor_speed[0] = motorsPwm[1] / outScale;
-    //pwmPkt.motor_speed[1] = motorsPwm[2] / outScale;
-    //pwmPkt.motor_speed[2] = motorsPwm[3] / outScale;
+    output->motorCount = (uint8_t)pwmRawPkt.motorCount;
+    for (int i = 0; i < pwmRawPkt.motorCount; ++i) {
+        output->motorSpeeds[i] = motorsPwm[i] / outScale;
+    }
 
     ++externalFrame;
 #ifdef USE_FLUSH_IO
