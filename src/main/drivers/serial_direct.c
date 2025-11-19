@@ -44,12 +44,6 @@ static const struct serialPortVTable directVTable; // Forward
 static directPort_t directSerialPorts[SERIAL_PORT_COUNT];
 static bool directPortInitialized[SERIAL_PORT_COUNT];
 
-static uartDataCallback uartDataCall = NULL;
-
-PLUGIN_EXPORT void setUartDataCallback(uartDataCallback callback) {
-    uartDataCall = callback;
-}
-
 static directPort_t* directReconfigure(directPort_t *s, int id)
 {
     if (directPortInitialized[id]) {
@@ -146,25 +140,19 @@ static uint8_t directRead(serialPort_t *instance)
     return ch;
 }
 
-static void uartWriteInternal(int id, const void* data, const int size) {
-    if (uartDataCall) {
-        uartDataCall(id, data, size);
-    }
-}
-
-void uartDataOut(directPort_t *instance)
+void uartDataOutPort(directPort_t *instance)
 {
     directPort_t *s = instance;
 
     if (s->port.txBufferHead < s->port.txBufferTail) {
         // send data till end of buffer
         int chunk = s->port.txBufferSize - s->port.txBufferTail;
-        uartWriteInternal(s->id, (const void *)&s->port.txBuffer[s->port.txBufferTail], chunk);
+        uartDataOut(s->id, (const void *)&s->port.txBuffer[s->port.txBufferTail], chunk);
         s->port.txBufferTail = 0;
     }
     int chunk = s->port.txBufferHead - s->port.txBufferTail;
     if (chunk)
-        uartWriteInternal(s->id, (const void*)&s->port.txBuffer[s->port.txBufferTail], chunk);
+        uartDataOut(s->id, (const void*)&s->port.txBuffer[s->port.txBufferTail], chunk);
     s->port.txBufferTail = s->port.txBufferHead;
 }
 
@@ -179,7 +167,7 @@ static void uartWrite(serialPort_t *instance, uint8_t ch)
         s->port.txBufferHead++;
     }
 
-    uartDataOut(s);
+    uartDataOutPort(s);
 }
 
 void directDataIn(directPort_t *s, uint8_t* ch, int size)

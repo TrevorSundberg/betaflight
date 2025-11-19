@@ -763,12 +763,27 @@ char _Min_Stack_Size;
 static FILE *eepromFd = NULL;
 */
 
+#define UART_BUFFER_SIZE 4096
+#define UART_CHANNELS 3
+
+typedef struct {
+    uint8_t* uartDataOut;
+    uint32_t uartDataSize;
+} uartBufferOutput;
+
 typedef struct {
     uint8_t cameraAngleDegrees;
     uint8_t* eeprom;
     uint32_t eepromSize;
     int32_t rebootRequest;
+    uartBufferOutput uartBuffers[UART_CHANNELS];
 } iterationOutput;
+
+typedef struct {
+    uint8_t uartDataOut[UART_BUFFER_SIZE];
+    uint32_t uartDataSize;
+} uartBuffer;
+
 STATIC_ASSERT(sizeof(int32_t) == sizeof(bootloaderRequestType_e), "bootloaderRequestType_e must be int32_t sized");
 
 uint64_t externalFrame = 0;
@@ -776,6 +791,8 @@ void updateRCInput(const rc_packet* data);
 void updateState(const fdm_packet* pkt);
 uint8_t eepromInitialData[EEPROM_SIZE];
 bool saveEEPROM = false;
+uartBuffer uartBuffers[UART_CHANNELS];
+
 PLUGIN_EXPORT void initialize(const void* eepromInData, const int eepromInSize) {
 #ifdef USE_FLUSH_IO
     FILE* err = freopen("stdout.log", "w", stdout);
@@ -811,11 +828,31 @@ PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, c
     output->rebootRequest = (int32_t)rebootRequest;
     rebootRequest = REBOOT_REQUEST_NONE;
 
+    for (int i = 0; i < UART_CHANNELS; ++i) {
+        uartBufferOutput* dst = &output->uartBuffers[i];
+        uartBuffer* src = &uartBuffers[i];
+        dst->uartDataSize = src->uartDataSize;
+        dst->uartDataOut = src->uartDataOut;
+        src->uartDataSize = 0;
+    }
+
     ++externalFrame;
 #ifdef USE_FLUSH_IO
     fflush(stdout);
     fflush(stderr);
 #endif
+}
+
+void uartDataOut(int id, const void* data, const int size) {
+    ASSERT_FORMAT(id >= 0 && id < UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
+
+    uartBuffer* buffer = &uartBuffers[id];
+    uint32_t newSize = buffer->uartDataSize + size;
+    ASSERT_FORMAT(newSize < UART_BUFFER_SIZE, "UART data buffer overflow: newSize(%d) uartDataSize(%d) size(%d)",
+            newSize, buffer->uartDataSize, size);
+
+    memcpy(buffer->uartDataOut + buffer->uartDataSize, data, size);
+    buffer->uartDataSize = newSize;
 }
 
 bool loadEEPROMFromFile(void)
