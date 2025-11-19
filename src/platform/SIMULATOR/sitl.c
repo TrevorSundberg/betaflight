@@ -812,6 +812,10 @@ PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, c
     rebootRequest = REBOOT_REQUEST_NONE;
 
     ++externalFrame;
+#ifdef USE_FLUSH_IO
+    fflush(stdout);
+    fflush(stderr);
+#endif
 }
 
 bool loadEEPROMFromFile(void)
