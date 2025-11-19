@@ -759,6 +759,19 @@ static FILE *eepromFd = NULL;
 #define UART_CHANNELS 3
 
 typedef struct {
+    uint8_t cameraAngleDegrees; // set to -1 to leave it as it is
+    void* uartDataInConfigurator;
+    int uartDataInSizeConfigurator;
+    uint16_t channels[SIMULATOR_MAX_RC_CHANNELS];   // RC channels
+    double imu_angular_velocity_rpy[3]; // rad/s -> range: +/- 8192; +/- 2000 deg/se
+    double imu_linear_acceleration_xyz[3];    // m/s/s NED, body frame -> sim 1G = 9.80665, FC 1G = 256
+    double imu_orientation_quat[4];     //w, x, y, z
+    double velocity_xyz[3];             // m/s, earth frame. ENU (Ve, Vn, Vup) for virtual GPS mode (USE_VIRTUAL_GPS)!
+    double position_xyz[3];             // meters, NED from origin. Longitude, Latitude, Altitude (ENU) for virtual GPS mode (USE_VIRTUAL_GPS)!
+    double pressure;
+} iterationInput;
+
+typedef struct {
     uint8_t* uartDataOut;
     uint32_t uartDataSize;
 } uartBufferOutput;
@@ -799,12 +812,41 @@ PLUGIN_EXPORT void initialize(const void* eepromInData, const int eepromInSize) 
     init();
 }
 
-PLUGIN_EXPORT void iteration(const rc_packet* rcpkt, const fdm_packet* fdmpkt, const void* data, const int size, uint8_t cameraAngle, iterationOutput* output) {
-    updateRCInput(rcpkt);
-    updateState(fdmpkt);
-    uartDataIn(0, data, size);
-    if (cameraAngle != (uint8_t)-1) {
-        rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
+PLUGIN_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
+    // Timestamp is only used for timeout and adjust sim speed which we don't want
+    const double timestamp = 0;
+
+    rc_packet rcpkt;
+    rcpkt.timestamp = timestamp;
+    STATIC_ASSERT(sizeof(rcpkt.channels) == sizeof(input->channels), "channels size must match");
+    memcpy(rcpkt.channels, input->channels, sizeof(input->channels));
+    updateRCInput(&rcpkt);
+
+    // TODO(trevor): Apply Unity transforms here, assume kongrothflight is in 
+    fdm_packet fdmpkt;
+    fdmpkt.timestamp = timestamp;
+    fdmpkt.imu_angular_velocity_rpy[0] = input->imu_angular_velocity_rpy[0];
+    fdmpkt.imu_angular_velocity_rpy[1] = input->imu_angular_velocity_rpy[1];
+    fdmpkt.imu_angular_velocity_rpy[2] = input->imu_angular_velocity_rpy[2];
+    fdmpkt.imu_linear_acceleration_xyz[0] = input->imu_linear_acceleration_xyz[0];
+    fdmpkt.imu_linear_acceleration_xyz[1] = input->imu_linear_acceleration_xyz[1];
+    fdmpkt.imu_linear_acceleration_xyz[2] = input->imu_linear_acceleration_xyz[2];
+    fdmpkt.imu_orientation_quat[0] = input->imu_orientation_quat[0];
+    fdmpkt.imu_orientation_quat[1] = input->imu_orientation_quat[1];
+    fdmpkt.imu_orientation_quat[2] = input->imu_orientation_quat[2];
+    fdmpkt.imu_orientation_quat[3] = input->imu_orientation_quat[3];
+    fdmpkt.velocity_xyz[0] = input->velocity_xyz[0];
+    fdmpkt.velocity_xyz[1] = input->velocity_xyz[1];
+    fdmpkt.velocity_xyz[2] = input->velocity_xyz[2];
+    fdmpkt.position_xyz[0] = input->position_xyz[0];
+    fdmpkt.position_xyz[1] = input->position_xyz[1];
+    fdmpkt.position_xyz[2] = input->position_xyz[2];
+    fdmpkt.pressure = input->pressure;
+    updateState(&fdmpkt);
+
+    uartDataIn(0, input->uartDataInConfigurator, input->uartDataInSizeConfigurator);
+    if (input->cameraAngleDegrees != (uint8_t)-1) {
+        rxConfigMutable()->fpvCamAngleDegrees = input->cameraAngleDegrees;
     }
     output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
     scheduler();
