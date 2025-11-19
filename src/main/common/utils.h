@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <assert.h>
 
 #define NOOP do {} while (0)
 
@@ -147,3 +148,13 @@ int clock_gettime_override(clockid_t clk_id, struct timespec *tp);
 #define nanosleep nanosleep_override
 #define clock_gettime clock_gettime_override
 #endif
+
+#define ASSERT_FORMAT(condition, format, ...)                     \
+  do {                                                            \
+    if (!(condition)) {                                           \
+      fprintf(stderr, "[%s] " format, #condition, ##__VA_ARGS__); \
+      fflush(stderr);                                             \
+      assert(false);                                              \
+    }                                                             \
+  } while (false)
+#define ASSERT(condition, text) ASSERT_FORMAT(condition, "%s", text)

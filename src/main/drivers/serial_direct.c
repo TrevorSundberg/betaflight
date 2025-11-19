@@ -195,9 +195,9 @@ void directDataIn(directPort_t *s, uint8_t* ch, int size)
 }
 
 void uartDataIn(int id, const void* data, const int size) {
-    if (id < 0 || id >= SERIAL_PORT_COUNT || !directPortInitialized[id]) {
-        abort();
-    }
+    ASSERT_FORMAT(id >= 0, "Id must be positive: %d", id);
+    ASSERT_FORMAT(id < SERIAL_PORT_COUNT, "Id should not be greater than SERIAL_PORT_COUNT(%d): %d", SERIAL_PORT_COUNT, id);
+    ASSERT_FORMAT(directPortInitialized[id], "Invalid or uninitialized id: %d", id);
     directDataIn(directSerialPorts + id, (uint8_t*)data, (int)size);
 }
 
