@@ -755,7 +755,7 @@ char _Min_Stack_Size;
 static FILE *eepromFd = NULL;
 */
 
-#define UART_BUFFER_SIZE 4096
+#define UART_BUFFER_SIZE 8192
 #define UART_CHANNELS 3
 
 typedef struct {

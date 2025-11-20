@@ -185,7 +185,7 @@ int nanosleep(const struct timespec *duration, struct timespec * rem) {
 
 #if defined(USE_DETERMINISM)
 // Keep in Sync with C# FlightController.SchedulerHZ
-#define SCHEDULER_HZ 16000ULL
+#define SCHEDULER_HZ 24000ULL
 
 #define NS_PER_SEC 1000000000ULL
 #define NS_PER_US 1000ULL
