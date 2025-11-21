@@ -770,7 +770,7 @@ void updateRCInput(const rc_packet* data);
 void updateState(const fdm_packet* pkt);
 uint8_t eepromInitialData[EEPROM_SIZE];
 bool saveEEPROM = false;
-uartBuffer uartBuffers[UART_CHANNELS];
+uartBuffer uartBuffers[KFLIGHT_MAX_UART_CHANNELS];
 
 void initialize(const void* eepromInData, const int eepromInSize) {
 #ifdef USE_FLUSH_IO
@@ -804,22 +804,22 @@ void iteration(iterationInput* input, iterationOutput* output) {
     // TODO(trevor): Apply Unity transforms here, assume kongrothflight is in 
     fdm_packet fdmpkt;
     fdmpkt.timestamp = timestamp;
-    fdmpkt.imu_angular_velocity_rpy[0] = input->imu_angular_velocity_rpy[0];
-    fdmpkt.imu_angular_velocity_rpy[1] = input->imu_angular_velocity_rpy[1];
-    fdmpkt.imu_angular_velocity_rpy[2] = input->imu_angular_velocity_rpy[2];
-    fdmpkt.imu_linear_acceleration_xyz[0] = input->imu_linear_acceleration_xyz[0];
-    fdmpkt.imu_linear_acceleration_xyz[1] = input->imu_linear_acceleration_xyz[1];
-    fdmpkt.imu_linear_acceleration_xyz[2] = input->imu_linear_acceleration_xyz[2];
-    fdmpkt.imu_orientation_quat[0] = input->imu_orientation_quat[0];
-    fdmpkt.imu_orientation_quat[1] = input->imu_orientation_quat[1];
-    fdmpkt.imu_orientation_quat[2] = input->imu_orientation_quat[2];
-    fdmpkt.imu_orientation_quat[3] = input->imu_orientation_quat[3];
-    fdmpkt.velocity_xyz[0] = input->velocity_xyz[0];
-    fdmpkt.velocity_xyz[1] = input->velocity_xyz[1];
-    fdmpkt.velocity_xyz[2] = input->velocity_xyz[2];
-    fdmpkt.position_xyz[0] = input->position_xyz[0];
-    fdmpkt.position_xyz[1] = input->position_xyz[1];
-    fdmpkt.position_xyz[2] = input->position_xyz[2];
+    fdmpkt.imu_angular_velocity_rpy[0] = input->angularVelocityXyz[0];
+    fdmpkt.imu_angular_velocity_rpy[1] = input->angularVelocityXyz[1];
+    fdmpkt.imu_angular_velocity_rpy[2] = input->angularVelocityXyz[2];
+    fdmpkt.imu_linear_acceleration_xyz[0] = input->linearAccelerationXyz[0];
+    fdmpkt.imu_linear_acceleration_xyz[1] = input->linearAccelerationXyz[1];
+    fdmpkt.imu_linear_acceleration_xyz[2] = input->linearAccelerationXyz[2];
+    fdmpkt.imu_orientation_quat[0] = input->orientationQuaternionWxyz[0];
+    fdmpkt.imu_orientation_quat[1] = input->orientationQuaternionWxyz[1];
+    fdmpkt.imu_orientation_quat[2] = input->orientationQuaternionWxyz[2];
+    fdmpkt.imu_orientation_quat[3] = input->orientationQuaternionWxyz[3];
+    fdmpkt.velocity_xyz[0] = input->velocityXyz[0];
+    fdmpkt.velocity_xyz[1] = input->velocityXyz[1];
+    fdmpkt.velocity_xyz[2] = input->velocityXyz[2];
+    fdmpkt.position_xyz[0] = input->positionXyz[0];
+    fdmpkt.position_xyz[1] = input->positionXyz[1];
+    fdmpkt.position_xyz[2] = input->positionXyz[2];
     fdmpkt.pressure = input->pressure;
     updateState(&fdmpkt);
 
@@ -842,7 +842,7 @@ void iteration(iterationInput* input, iterationOutput* output) {
     output->rebootRequest = (int32_t)rebootRequest;
     rebootRequest = REBOOT_REQUEST_NONE;
 
-    for (int i = 0; i < UART_CHANNELS; ++i) {
+    for (int i = 0; i < KFLIGHT_MAX_UART_CHANNELS; ++i) {
         uartBufferOutput* dst = &output->uartBuffers[i];
         uartBuffer* src = &uartBuffers[i];
         dst->uartDataSize = src->uartDataSize;
@@ -868,7 +868,7 @@ void iteration(iterationInput* input, iterationOutput* output) {
 }
 
 void uartDataOut(int id, const void* data, const int size) {
-    ASSERT_FORMAT(id >= 0 && id < UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
+    ASSERT_FORMAT(id >= 0 && id < KFLIGHT_MAX_UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
 
     uartBuffer* buffer = &uartBuffers[id];
     uint32_t newSize = buffer->uartDataSize + size;
