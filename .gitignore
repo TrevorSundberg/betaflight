@@ -26,8 +26,7 @@ README.pdf
 /build_linux/
 /build_wasi/
 /build_windows/
-/physics/physics_copy.c
-/physics/shared.h
+/src/platform/SIMULATOR/interface.h
 # local changes only
 mk/local.mk
 
