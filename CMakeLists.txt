@@ -145,7 +145,6 @@ add_library(betaflight_SITL SHARED
   src/main/sensors/initialisation.c
   src/main/sensors/voltage.c
   src/platform/SIMULATOR/sitl.c
-  physics/physics_copy.c
 )
 
 target_include_directories(betaflight_SITL PRIVATE
