@@ -133,13 +133,10 @@ void * memcpy_fn ( void * destination, const void * source, size_t num ) asm("me
 #endif
 
 #if defined(_WIN32)
-# define PLUGIN_EXPORT __declspec(dllexport)
 int ffs(int i);
 char *strsep(char **restrict stringp, const char *restrict delim);
 char *strcasestr(const char *haystack, const char *needle);
 int nanosleep(const struct timespec *duration, struct timespec * rem);
-#else
-# define PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
 #if defined(USE_DETERMINISM)

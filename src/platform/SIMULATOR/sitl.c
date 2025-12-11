@@ -772,7 +772,7 @@ uint8_t eepromInitialData[EEPROM_SIZE];
 bool saveEEPROM = false;
 uartBuffer uartBuffers[KFLIGHT_MAX_UART_CHANNELS];
 
-void initialize(const void* eepromInData, const int eepromInSize) {
+KFLIGHT_EXPORT void initialize(const void* eepromInData, const uint32_t eepromInSize) {
 #ifdef USE_FLUSH_IO
     FILE* err = freopen("stdout.log", "w", stdout);
     FILE* out = freopen("stderr.log", "w", stderr);
@@ -785,7 +785,7 @@ void initialize(const void* eepromInData, const int eepromInSize) {
     init();
 }
 
-void iteration(iterationInput* input, iterationOutput* output) {
+KFLIGHT_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
     // Timestamp is only used for timeout and adjust sim speed which we don't want
     const double timestamp = 0;
 
