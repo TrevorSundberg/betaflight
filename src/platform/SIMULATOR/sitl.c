@@ -73,7 +73,6 @@
 #include "io/gps_virtual.h"
 #include "fc/init.h"
 #include "drivers/serial_direct.h"
-#include "interface.h"
 
 /*
 #include <pthread.h>
@@ -785,7 +784,7 @@ KFLIGHT_EXPORT void initialize(const void* eepromInData, const uint32_t eepromIn
     init();
 }
 
-KFLIGHT_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
+KFLIGHT_EXPORT void iteration(const uint32_t iterations, const uint32_t flags, iterationInput* input, iterationOutput* output) {
     // Timestamp is only used for timeout and adjust sim speed which we don't want
     const double timestamp = 0;
 
@@ -827,27 +826,10 @@ KFLIGHT_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
     if (input->cameraAngleDegrees != (uint8_t)-1) {
         rxConfigMutable()->fpvCamAngleDegrees = input->cameraAngleDegrees;
     }
-    output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
-    scheduler();
 
-    if (saveEEPROM) {
-        output->eepromSize = EEPROM_SIZE;
-        output->eeprom = eepromData;
-        saveEEPROM = false;
-    } else {
-        output->eepromSize = 0;
-        output->eeprom = NULL;
-    }
-
-    output->rebootRequest = (int32_t)rebootRequest;
-    rebootRequest = REBOOT_REQUEST_NONE;
-
-    for (int i = 0; i < KFLIGHT_MAX_UART_CHANNELS; ++i) {
-        uartBufferOutput* dst = &output->uartBuffers[i];
-        uartBuffer* src = &uartBuffers[i];
-        dst->uartDataSize = src->uartDataSize;
-        dst->uartDataOut = src->uartDataOut;
-        src->uartDataSize = 0;
+    for (uint32_t i = 0; i < iterations; ++i) {
+        scheduler();
+        ++externalFrame;
     }
 
     double outScale = 1000.0;
@@ -860,7 +842,30 @@ KFLIGHT_EXPORT void iteration(iterationInput* input, iterationOutput* output) {
         output->motorSpeeds[i] = motorsPwm[i] / outScale;
     }
 
-    ++externalFrame;
+    if ((flags & KFLIGHT_FLAGS_FINAL_ITERATION) != 0) {
+        output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
+
+        if (saveEEPROM) {
+            output->eepromSize = EEPROM_SIZE;
+            output->eeprom = eepromData;
+            saveEEPROM = false;
+        } else {
+            output->eepromSize = 0;
+            output->eeprom = NULL;
+        }
+
+        output->rebootRequest = (int32_t)rebootRequest;
+        rebootRequest = REBOOT_REQUEST_NONE;
+
+        for (int i = 0; i < KFLIGHT_MAX_UART_CHANNELS; ++i) {
+            uartBufferOutput* dst = &output->uartBuffers[i];
+            uartBuffer* src = &uartBuffers[i];
+            dst->uartDataSize = src->uartDataSize;
+            dst->uartDataOut = src->uartDataOut;
+            src->uartDataSize = 0;
+        }
+    }
+
 #ifdef USE_FLUSH_IO
     fflush(stdout);
     fflush(stderr);

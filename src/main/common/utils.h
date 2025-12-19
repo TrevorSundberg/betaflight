@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <assert.h>
+#include "interface.h"
 
 #define NOOP do {} while (0)
 
