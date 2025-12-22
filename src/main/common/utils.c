@@ -186,7 +186,7 @@ int nanosleep(const struct timespec *duration, struct timespec * rem) {
 #if defined(USE_DETERMINISM)
 #define NS_PER_SEC 1000000000ULL
 #define NS_PER_US 1000ULL
-#define NS_PER_FRAME (NS_PER_SEC / ((uint64_t)KFLIGHT_SCHEDULER_HZ))
+#define NS_PER_FRAME (NS_PER_SEC / ((uint64_t)KF_SCHEDULER_HZ))
 #define MAX_CLOCK_SAMPLES_PER_FRAME 1000ULL
 #define NS_PER_CLOCK_GETTIME (NS_PER_FRAME / MAX_CLOCK_SAMPLES_PER_FRAME)
 

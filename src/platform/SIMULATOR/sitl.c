@@ -769,9 +769,9 @@ void updateRCInput(const rc_packet* data);
 void updateState(const fdm_packet* pkt);
 uint8_t eepromInitialData[EEPROM_SIZE];
 bool saveEEPROM = false;
-uartBuffer uartBuffers[KFLIGHT_MAX_UART_CHANNELS];
+uartBuffer uartBuffers[KF_MAX_UART_CHANNELS];
 
-KFLIGHT_EXPORT void initialize(const void* eepromInData, const uint32_t eepromInSize) {
+KF_EXPORT void kf_initialize(const void* eepromInData, const uint32_t eepromInSize) {
 #ifdef USE_FLUSH_IO
     FILE* err = freopen("stdout.log", "w", stdout);
     FILE* out = freopen("stderr.log", "w", stderr);
@@ -784,7 +784,7 @@ KFLIGHT_EXPORT void initialize(const void* eepromInData, const uint32_t eepromIn
     init();
 }
 
-KFLIGHT_EXPORT void iteration(const uint32_t iterations, const uint32_t flags, iterationInput* input, iterationOutput* output) {
+KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, iterationInput* input, iterationOutput* output) {
     // Timestamp is only used for timeout and adjust sim speed which we don't want
     const double timestamp = 0;
 
@@ -842,7 +842,7 @@ KFLIGHT_EXPORT void iteration(const uint32_t iterations, const uint32_t flags, i
         output->motorSpeeds[i] = motorsPwm[i] / outScale;
     }
 
-    if ((flags & KFLIGHT_FLAGS_FINAL_ITERATION) != 0) {
+    if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
         output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
 
         if (saveEEPROM) {
@@ -857,7 +857,7 @@ KFLIGHT_EXPORT void iteration(const uint32_t iterations, const uint32_t flags, i
         output->rebootRequest = (int32_t)rebootRequest;
         rebootRequest = REBOOT_REQUEST_NONE;
 
-        for (int i = 0; i < KFLIGHT_MAX_UART_CHANNELS; ++i) {
+        for (int i = 0; i < KF_MAX_UART_CHANNELS; ++i) {
             uartBufferOutput* dst = &output->uartBuffers[i];
             uartBuffer* src = &uartBuffers[i];
             dst->uartDataSize = src->uartDataSize;
@@ -873,7 +873,7 @@ KFLIGHT_EXPORT void iteration(const uint32_t iterations, const uint32_t flags, i
 }
 
 void uartDataOut(int id, const void* data, const int size) {
-    ASSERT_FORMAT(id >= 0 && id < KFLIGHT_MAX_UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
+    ASSERT_FORMAT(id >= 0 && id < KF_MAX_UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
 
     uartBuffer* buffer = &uartBuffers[id];
     uint32_t newSize = buffer->uartDataSize + size;

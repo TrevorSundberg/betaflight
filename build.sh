@@ -3,7 +3,7 @@ set -ex
 
 : "${BUILD_TYPE:=Debug}"
 
-cp ../../src/interface.h src/platform/SIMULATOR/interface.h
+cp ../../src/kongroth_flight.h src/platform/SIMULATOR/kongroth_flight.h
 #make OPTIONS=USE_GPS TARGET=SITL
 docker buildx build --progress=plain --target linux -t betaflight_linux ./docker
 docker buildx build --progress=plain --target wasi -t betaflight_wasi ./docker
