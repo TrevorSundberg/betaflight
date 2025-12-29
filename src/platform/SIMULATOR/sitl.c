@@ -784,48 +784,82 @@ KF_EXPORT void kf_initialize(const void* eepromInData, const uint32_t eepromInSi
     init();
 }
 
-KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, iterationInput* input, iterationOutput* output) {
+void set_channel(int channel, rc_packet* rcpkt, double value) {
+    rxConfig_t* config = rxConfig();
+    uint16_t pwm = value >= 0.0f
+        ? config->midrc + (uint16_t)((config->rx_max_usec - config->midrc) * value)
+        : config->rx_min_usec + (uint16_t)((config->midrc - config->rx_min_usec) * (1.0f + value));
+    rcpkt->channels[channel] = pwm;
+}
+
+KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, struct flight_states *const flight_states, const uint32_t state_index, iterationOutput* output) {
     // Timestamp is only used for timeout and adjust sim speed which we don't want
     const double timestamp = 0;
 
     rc_packet rcpkt;
     rcpkt.timestamp = timestamp;
-    rxConfig_t* config = rxConfig();
-    for (int i = 0; i < SIMULATOR_MAX_RC_CHANNELS; ++i) {
-        float value = input->channels[i];
-        uint16_t pwm = value >= 0.0f
-            ? config->midrc + (uint16_t)((config->rx_max_usec - config->midrc) * value)
-            : config->rx_min_usec + (uint16_t)((config->midrc - config->rx_min_usec) * (1.0f + value));
-        rcpkt.channels[i] = pwm;
+
+    // AETR1234
+    set_channel(0, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_ROLL));
+    set_channel(1, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_PITCH));
+    set_channel(2, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_THROTTLE));
+    set_channel(3, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_YAW));
+    set_channel(4, &rcpkt, controller_states_get_arm_command(&flight_states->controller_states, state_index));
+    set_channel(5, &rcpkt, controller_states_get_mode_command(&flight_states->controller_states, state_index));
+    for (int i = 6; i < SIMULATOR_MAX_RC_CHANNELS; ++i) {
+        rcpkt.channels[i] = rxConfig()->rx_min_usec;
     }
     updateRCInput(&rcpkt);
 
     // TODO(trevor): Apply Unity transforms here, assume kongrothflight is in 
     fdm_packet fdmpkt;
+
+    // BetaFlight:
+    // X - Forward
+    // Y - Left
+    // Z - Up
+
+    // Unity:
+    // X - Right
+    // Y - Up
+    // Z - Forward
+
+    // BetaFlight X =  Unity Z
+    // BetaFlight Y = -Unity X
+    // BetaFlight Z =  Unity Y
+
+    // Quaternion W is the same
+
     fdmpkt.timestamp = timestamp;
-    fdmpkt.imu_angular_velocity_rpy[0] = input->angularVelocityXyz[0];
-    fdmpkt.imu_angular_velocity_rpy[1] = input->angularVelocityXyz[1];
-    fdmpkt.imu_angular_velocity_rpy[2] = input->angularVelocityXyz[2];
-    fdmpkt.imu_linear_acceleration_xyz[0] = input->linearAccelerationXyz[0];
-    fdmpkt.imu_linear_acceleration_xyz[1] = input->linearAccelerationXyz[1];
-    fdmpkt.imu_linear_acceleration_xyz[2] = input->linearAccelerationXyz[2];
-    fdmpkt.imu_orientation_quat[0] = input->orientationQuaternionWxyz[0];
-    fdmpkt.imu_orientation_quat[1] = input->orientationQuaternionWxyz[1];
-    fdmpkt.imu_orientation_quat[2] = input->orientationQuaternionWxyz[2];
-    fdmpkt.imu_orientation_quat[3] = input->orientationQuaternionWxyz[3];
-    fdmpkt.velocity_xyz[0] = input->velocityXyz[0];
-    fdmpkt.velocity_xyz[1] = input->velocityXyz[1];
-    fdmpkt.velocity_xyz[2] = input->velocityXyz[2];
-    fdmpkt.position_xyz[0] = input->positionXyz[0];
-    fdmpkt.position_xyz[1] = input->positionXyz[1];
-    fdmpkt.position_xyz[2] = input->positionXyz[2];
-    fdmpkt.pressure = input->pressure;
+    fdmpkt.imu_angular_velocity_rpy[0] = -physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.imu_angular_velocity_rpy[1] = -physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.imu_angular_velocity_rpy[2] = +physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_Y);
+
+    fdmpkt.imu_linear_acceleration_xyz[0] = -physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.imu_linear_acceleration_xyz[1] = -physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.imu_linear_acceleration_xyz[2] = +physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_Y);
+
+    fdmpkt.imu_orientation_quat[0] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.imu_orientation_quat[1] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.imu_orientation_quat[2] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.imu_orientation_quat[3] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_W);
+
+    fdmpkt.velocity_xyz[0] = -physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.velocity_xyz[1] = -physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.velocity_xyz[2] = +physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_Y);
+
+    fdmpkt.position_xyz[0] = -physics_states_get_position_world(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.position_xyz[1] = -physics_states_get_position_world(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.position_xyz[2] = +physics_states_get_position_world(&flight_states->physics_states, state_index, KF_Y);
+
+    fdmpkt.pressure = drone_states_get_barometer_pressure_pa(&flight_states->drone_states, state_index);
     updateState(&fdmpkt);
 
-    uartDataIn(0, input->uartDataInConfigurator, input->uartDataInSizeConfigurator);
-    if (input->cameraAngleDegrees != (uint8_t)-1) {
-        rxConfigMutable()->fpvCamAngleDegrees = input->cameraAngleDegrees;
-    }
+    // TODO(trevor): Figure out UART data and camera settings in kongroth_flight
+    //uartDataIn(0, input->uartDataInConfigurator, input->uartDataInSizeConfigurator);
+    //if (input->cameraAngleDegrees != (uint8_t)-1) {
+    //    rxConfigMutable()->fpvCamAngleDegrees = input->cameraAngleDegrees;
+    //}
 
     for (uint32_t i = 0; i < iterations; ++i) {
         scheduler();
