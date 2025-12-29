@@ -145,6 +145,7 @@ add_library(betaflight_SITL SHARED
   src/main/sensors/initialisation.c
   src/main/sensors/voltage.c
   src/platform/SIMULATOR/sitl.c
+  src/platform/SIMULATOR/kongroth_flight.c
 )
 
 target_include_directories(betaflight_SITL PRIVATE
