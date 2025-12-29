@@ -26,7 +26,7 @@ README.pdf
 /build_linux/
 /build_wasi/
 /build_windows/
-/src/platform/SIMULATOR/interface.h
+/src/platform/SIMULATOR/kongroth_flight.h
 # local changes only
 mk/local.mk
 

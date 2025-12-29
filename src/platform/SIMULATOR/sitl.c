@@ -873,11 +873,11 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, ite
 }
 
 void uartDataOut(int id, const void* data, const int size) {
-    ASSERT_FORMAT(id >= 0 && id < KF_MAX_UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
+    KF_ASSERT_FORMAT(id >= 0 && id < KF_MAX_UART_CHANNELS, "Unhandled UART id, increase channels if needed: %d", id);
 
     uartBuffer* buffer = &uartBuffers[id];
     uint32_t newSize = buffer->uartDataSize + size;
-    ASSERT_FORMAT(newSize < UART_BUFFER_SIZE, "UART data buffer overflow: newSize(%d) uartDataSize(%d) size(%d)",
+    KF_ASSERT_FORMAT(newSize < UART_BUFFER_SIZE, "UART data buffer overflow: newSize(%d) uartDataSize(%d) size(%d)",
             newSize, buffer->uartDataSize, size);
 
     memcpy(buffer->uartDataOut + buffer->uartDataSize, data, size);
