@@ -811,9 +811,6 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     }
     updateRCInput(&rcpkt);
 
-    // TODO(trevor): Apply Unity transforms here, assume kongrothflight is in 
-    fdm_packet fdmpkt;
-
     // BetaFlight:
     // X - Forward
     // Y - Left
@@ -830,6 +827,7 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
 
     // Quaternion W is the same
 
+    fdm_packet fdmpkt;
     fdmpkt.timestamp = timestamp;
     fdmpkt.imu_angular_velocity_rpy[0] = -physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_Z);
     fdmpkt.imu_angular_velocity_rpy[1] = -physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_X);
