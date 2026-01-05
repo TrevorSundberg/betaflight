@@ -894,6 +894,8 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
             uartBuffer* src = &uartBuffers[i];
             dst->uartDataSize = src->uartDataSize;
             dst->uartDataOut = src->uartDataOut;
+            firmware_states_set_uart_data_out(&flight_states->firmware_states, state_index, i, src->uartDataOut);
+            firmware_states_set_uart_data_size(&flight_states->firmware_states, state_index, i, src->uartDataSize);
             src->uartDataSize = 0;
         }
     }
