@@ -829,18 +829,18 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
 
     fdm_packet fdmpkt;
     fdmpkt.timestamp = timestamp;
-    fdmpkt.imu_angular_velocity_rpy[0] = -physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.imu_angular_velocity_rpy[1] = -physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.imu_angular_velocity_rpy[2] = +physics_states_get_angular_velocity_world(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.imu_angular_velocity_rpy[0] = -physics_states_get_angular_velocity_local(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.imu_angular_velocity_rpy[1] = -physics_states_get_angular_velocity_local(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.imu_angular_velocity_rpy[2] = +physics_states_get_angular_velocity_local(&flight_states->physics_states, state_index, KF_Y);
 
     fdmpkt.imu_linear_acceleration_xyz[0] = -physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_Z);
     fdmpkt.imu_linear_acceleration_xyz[1] = -physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_X);
     fdmpkt.imu_linear_acceleration_xyz[2] = +physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_Y);
 
-    fdmpkt.imu_orientation_quat[0] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.imu_orientation_quat[1] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.imu_orientation_quat[2] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Y);
-    fdmpkt.imu_orientation_quat[3] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_W);
+    fdmpkt.imu_orientation_quat[0] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_W);
+    fdmpkt.imu_orientation_quat[1] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Z);
+    fdmpkt.imu_orientation_quat[2] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_X);
+    fdmpkt.imu_orientation_quat[3] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Y);
 
     fdmpkt.velocity_xyz[0] = -physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_Z);
     fdmpkt.velocity_xyz[1] = -physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_X);
@@ -869,8 +869,10 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
         outScale = 500.0;
     }
 
+    drone_states_set_motor_count(&flight_states->drone_states, state_index, (char)pwmRawPkt.motorCount);
     output->motorCount = (uint8_t)pwmRawPkt.motorCount;
-    for (int i = 0; i < pwmRawPkt.motorCount; ++i) {
+    for (uint32_t i = 0; i < pwmRawPkt.motorCount; ++i) {
+        drone_states_set_motor_outputs(&flight_states->drone_states, state_index, i,  motorsPwm[i] / outScale);
         output->motorSpeeds[i] = motorsPwm[i] / outScale;
     }
 
