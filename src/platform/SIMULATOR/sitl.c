@@ -852,9 +852,14 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
 
     fdmpkt.pressure = drone_states_get_barometer_pressure_pa(&flight_states->drone_states, state_index);
     updateState(&fdmpkt);
+    
+    uartDataIn(
+        0,
+        firmware_states_get_uart_data_in_configurator(&flight_states->firmware_states, state_index),
+        firmware_states_get_uart_data_in_size_configurator(&flight_states->firmware_states, state_index));
 
-    // TODO(trevor): Figure out UART data and camera settings in kongroth_flight
-    //uartDataIn(0, input->uartDataInConfigurator, input->uartDataInSizeConfigurator);
+    // SEE FlightController.cs and below (same comment)
+    // TODO(trevor): Hook camera angle back up
     //if (input->cameraAngleDegrees != (uint8_t)-1) {
     //    rxConfigMutable()->fpvCamAngleDegrees = input->cameraAngleDegrees;
     //}
@@ -898,7 +903,7 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
         for (int i = 0; i < KF_MAX_UART_CHANNELS; ++i) {
             uartBuffer* src = &uartBuffers[i];
             firmware_states_set_uart_data_out(&flight_states->firmware_states, state_index, i, src->uartDataOut);
-            firmware_states_set_uart_data_size(&flight_states->firmware_states, state_index, i, src->uartDataSize);
+            firmware_states_set_uart_data_out_size(&flight_states->firmware_states, state_index, i, src->uartDataSize);
             src->uartDataSize = 0;
         }
     }
