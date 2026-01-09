@@ -857,6 +857,8 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
         0,
         firmware_states_get_uart_data_in_configurator(&flight_states->firmware_states, state_index),
         firmware_states_get_uart_data_in_size_configurator(&flight_states->firmware_states, state_index));
+    firmware_states_set_uart_data_in_configurator(&flight_states->firmware_states, state_index, NULL);
+    firmware_states_set_uart_data_in_size_configurator(&flight_states->firmware_states, state_index, 0);
 
     // SEE FlightController.cs and below (same comment)
     // TODO(trevor): Hook camera angle back up
