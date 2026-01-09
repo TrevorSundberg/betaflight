@@ -755,7 +755,7 @@ char _Min_Stack_Size;
 static FILE *eepromFd = NULL;
 */
 
-#define UART_BUFFER_SIZE (1<<14)
+#define UART_BUFFER_SIZE (1<<15)
 
 typedef struct {
     uint8_t uartDataOut[UART_BUFFER_SIZE];
