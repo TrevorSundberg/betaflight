@@ -895,10 +895,8 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
         //    output->eeprom = NULL;
         //}
 
-        // SEE FlightController.cs
-        // TODO(trevor): Get rebooting requests working
-        //output->rebootRequest = (int32_t)rebootRequest;
-        //rebootRequest = REBOOT_REQUEST_NONE;
+        firmware_states_set_reboot_request(&flight_states->firmware_states, state_index, (uint32_t)rebootRequest);
+        rebootRequest = REBOOT_REQUEST_NONE;
 
         for (int i = 0; i < KF_MAX_UART_CHANNELS; ++i) {
             uartBuffer* src = &uartBuffers[i];
