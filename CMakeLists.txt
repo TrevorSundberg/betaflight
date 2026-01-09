@@ -220,6 +220,10 @@ else()
   )
 endif()
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_compile_options(betaflight_SITL PRIVATE "-fno-semantic-interposition")
+endif()
+
 #target_link_options(betaflight_SITL PRIVATE
 #  -mexec-model=reactor
 #)
