@@ -792,7 +792,7 @@ void set_channel(int channel, rc_packet* rcpkt, double value) {
     rcpkt->channels[channel] = pwm;
 }
 
-KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, struct flight_states *const flight_states, const uint32_t state_index, iterationOutput* output) {
+KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, struct flight_states *const flight_states, const uint32_t state_index) {
     // Timestamp is only used for timeout and adjust sim speed which we don't want
     const double timestamp = 0;
 
@@ -870,32 +870,33 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     }
 
     drone_states_set_motor_count(&flight_states->drone_states, state_index, (char)pwmRawPkt.motorCount);
-    output->motorCount = (uint8_t)pwmRawPkt.motorCount;
     for (uint32_t i = 0; i < pwmRawPkt.motorCount; ++i) {
         drone_states_set_motor_outputs(&flight_states->drone_states, state_index, i,  motorsPwm[i] / outScale);
-        output->motorSpeeds[i] = motorsPwm[i] / outScale;
     }
 
     if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
-        output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
+        // SEE FlightController.cs
+        // TODO(trevor): Hook camera angle back up
+        //output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
 
-        if (saveEEPROM) {
-            output->eepromSize = EEPROM_SIZE;
-            output->eeprom = eepromData;
-            saveEEPROM = false;
-        } else {
-            output->eepromSize = 0;
-            output->eeprom = NULL;
-        }
+        // SEE FlightController.cs
+        // TODO(trevor): Get eeprom output/saving from the flight controller working (rebooting working first)
+        //if (saveEEPROM) {
+        //    output->eepromSize = EEPROM_SIZE;
+        //    output->eeprom = eepromData;
+        //    saveEEPROM = false;
+        //} else {
+        //    output->eepromSize = 0;
+        //    output->eeprom = NULL;
+        //}
 
-        output->rebootRequest = (int32_t)rebootRequest;
-        rebootRequest = REBOOT_REQUEST_NONE;
+        // SEE FlightController.cs
+        // TODO(trevor): Get rebooting requests working
+        //output->rebootRequest = (int32_t)rebootRequest;
+        //rebootRequest = REBOOT_REQUEST_NONE;
 
         for (int i = 0; i < KF_MAX_UART_CHANNELS; ++i) {
-            uartBufferOutput* dst = &output->uartBuffers[i];
             uartBuffer* src = &uartBuffers[i];
-            dst->uartDataSize = src->uartDataSize;
-            dst->uartDataOut = src->uartDataOut;
             firmware_states_set_uart_data_out(&flight_states->firmware_states, state_index, i, src->uartDataOut);
             firmware_states_set_uart_data_size(&flight_states->firmware_states, state_index, i, src->uartDataSize);
             src->uartDataSize = 0;
