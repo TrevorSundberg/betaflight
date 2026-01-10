@@ -113,9 +113,7 @@ static char simulator_ip[32] = "127.0.0.1";
 #define PORT_STATE      9003    // In
 #define PORT_RC         9004    // In
 
-#define REBOOT_REQUEST_NORMAL ((bootloaderRequestType_e)-1)
-#define REBOOT_REQUEST_NONE ((bootloaderRequestType_e)-2)
-bootloaderRequestType_e rebootRequest = REBOOT_REQUEST_NONE;
+bootloaderRequestType_e rebootRequest = (bootloaderRequestType_e)KF_REBOOT_REQUEST_NONE;
 
 int targetParseArgs(int argc, char * argv[])
 {
@@ -416,7 +414,7 @@ void systemInit(void)
 
 void systemReset(void)
 {
-    rebootRequest = REBOOT_REQUEST_NORMAL;
+    rebootRequest = (bootloaderRequestType_e)KF_REBOOT_REQUEST_NORMAL;
     /*
     printf("[system]Reset!\n");
     workerRunning = false;
@@ -883,19 +881,14 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
         firmware_states_set_camera_angle(&flight_states->firmware_states, state_index, (char)rxConfig()->fpvCamAngleDegrees);
 
-        // SEE FlightController.cs
-        // TODO(trevor): Get eeprom output/saving from the flight controller working (rebooting working first)
-        //if (saveEEPROM) {
-        //    output->eepromSize = EEPROM_SIZE;
-        //    output->eeprom = eepromData;
-        //    saveEEPROM = false;
-        //} else {
-        //    output->eepromSize = 0;
-        //    output->eeprom = NULL;
-        //}
+        if (saveEEPROM) {
+            firmware_states_set_eeprom_out(&flight_states->firmware_states, state_index, eepromData);
+            firmware_states_set_eeprom_out_size(&flight_states->firmware_states, state_index, EEPROM_SIZE);
+            saveEEPROM = false;
+        }
 
         firmware_states_set_reboot_request(&flight_states->firmware_states, state_index, (uint32_t)rebootRequest);
-        rebootRequest = REBOOT_REQUEST_NONE;
+        rebootRequest = (bootloaderRequestType_e)KF_REBOOT_REQUEST_NONE;
 
         for (int i = 0; i < KF_MAX_UART_CHANNELS; ++i) {
             uartBuffer* src = &uartBuffers[i];
