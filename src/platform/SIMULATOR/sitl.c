@@ -858,7 +858,7 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     firmware_states_set_uart_data_in_configurator(&flight_states->firmware_states, state_index, NULL);
     firmware_states_set_uart_data_in_size_configurator(&flight_states->firmware_states, state_index, 0);
 
-    char cameraAngle = firmware_states_get_camera_angle(&flight_states->firmware_states, state_index);
+    char cameraAngle = firmware_states_get_camera_angle_in(&flight_states->firmware_states, state_index);
     if (cameraAngle != KF_INVALID_CAMERA_ANGLE) {
         rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
     }
@@ -879,7 +879,7 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     }
 
     if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
-        firmware_states_set_camera_angle(&flight_states->firmware_states, state_index, (char)rxConfig()->fpvCamAngleDegrees);
+        firmware_states_set_camera_angle_out(&flight_states->firmware_states, state_index, (char)rxConfig()->fpvCamAngleDegrees);
 
         if (saveEEPROM) {
             firmware_states_set_eeprom_out(&flight_states->firmware_states, state_index, eepromData);
