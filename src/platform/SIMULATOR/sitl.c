@@ -860,11 +860,10 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     firmware_states_set_uart_data_in_configurator(&flight_states->firmware_states, state_index, NULL);
     firmware_states_set_uart_data_in_size_configurator(&flight_states->firmware_states, state_index, 0);
 
-    // SEE FlightController.cs and below (same comment)
-    // TODO(trevor): Hook camera angle back up
-    //if (input->cameraAngleDegrees != (uint8_t)-1) {
-    //    rxConfigMutable()->fpvCamAngleDegrees = input->cameraAngleDegrees;
-    //}
+    char cameraAngle = firmware_states_get_camera_angle(&flight_states->firmware_states, state_index);
+    if (cameraAngle != KF_INVALID_CAMERA_ANGLE) {
+        rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
+    }
 
     for (uint32_t i = 0; i < iterations; ++i) {
         scheduler();
@@ -882,9 +881,7 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     }
 
     if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
-        // SEE FlightController.cs
-        // TODO(trevor): Hook camera angle back up
-        //output->cameraAngleDegrees = rxConfig()->fpvCamAngleDegrees;
+        firmware_states_set_camera_angle(&flight_states->firmware_states, state_index, (char)rxConfig()->fpvCamAngleDegrees);
 
         // SEE FlightController.cs
         // TODO(trevor): Get eeprom output/saving from the flight controller working (rebooting working first)
