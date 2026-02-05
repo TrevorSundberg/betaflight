@@ -52,6 +52,11 @@
 #include "drivers/accgyro/accgyro_virtual.h"
 #include "drivers/barometer/barometer_virtual.h"
 #include "flight/imu.h"
+#include "flight/pid.h"
+#include "sensors/gyro.h"
+#include "sensors/acceleration.h"
+#include "fc/rc.h"
+#include "fc/rc_controls.h"
 
 #include "config/feature.h"
 #include "config/config.h"
@@ -768,6 +773,724 @@ void updateState(const fdm_packet* pkt);
 uint8_t eepromInitialData[EEPROM_SIZE];
 bool saveEEPROM = false;
 uartBuffer uartBuffers[KF_MAX_UART_CHANNELS];
+
+extern quaternion_t headfree;
+extern quaternion_t offset;
+
+#ifdef USE_THROTTLE_BOOST
+extern float throttleBoost;
+extern pt1Filter_t throttleLpf;
+#endif
+
+#define KF_COPY_FIELD(dst, src, field) ((dst)->field = (src)->field)
+#define KF_COPY_ARRAY(dst, src, field) memcpy((dst)->field, (src)->field, sizeof((dst)->field))
+
+typedef struct kf_pid_runtime_state_s {
+    float dT;
+    float pidFrequency;
+    bool pidStabilisationEnabled;
+    float previousPidSetpoint[XYZ_AXIS_COUNT];
+    biquadFilter_t dtermNotch[XYZ_AXIS_COUNT];
+    dtermLowpass_t dtermLowpass[XYZ_AXIS_COUNT];
+    dtermLowpass_t dtermLowpass2[XYZ_AXIS_COUNT];
+    pt1Filter_t ptermYawLowpass;
+    bool antiGravityEnabled;
+    pt2Filter_t antiGravityLpf;
+    float antiGravityOsdCutoff;
+    float antiGravityThrottleD;
+    float itermAccelerator;
+    uint8_t antiGravityGain;
+    float antiGravityPGain;
+    pidCoefficient_t pidCoefficient[XYZ_AXIS_COUNT];
+    float angleGain;
+    float angleFeedforwardGain;
+    float horizonGain;
+    float horizonLimitSticks;
+    float horizonLimitSticksInv;
+    float horizonLimitDegrees;
+    float horizonLimitDegreesInv;
+    float horizonIgnoreSticks;
+    float maxVelocity[XYZ_AXIS_COUNT];
+    bool inCrashRecoveryMode;
+    timeUs_t crashDetectedAtUs;
+    timeDelta_t crashTimeLimitUs;
+    timeDelta_t crashTimeDelayUs;
+    int32_t crashRecoveryAngleDeciDegrees;
+    float crashRecoveryRate;
+    float crashGyroThreshold;
+    float crashDtermThreshold;
+    float crashSetpointThreshold;
+    float crashLimitYaw;
+    float itermLimit;
+    float itermLimitYaw;
+    bool itermRotation;
+    bool zeroThrottleItermReset;
+    bool levelRaceMode;
+    float tpaFactor;
+    float tpaBreakpoint;
+    float tpaMultiplier;
+    float tpaLowBreakpoint;
+    float tpaLowMultiplier;
+    bool tpaLowAlways;
+    bool useEzDisarm;
+    float landingDisarmThreshold;
+
+#ifdef USE_ITERM_RELAX
+    pt1Filter_t windupLpf[XYZ_AXIS_COUNT];
+    uint8_t itermRelax;
+    uint8_t itermRelaxType;
+    uint8_t itermRelaxCutoff;
+#endif
+
+#ifdef USE_ABSOLUTE_CONTROL
+    float acCutoff;
+    float acGain;
+    float acLimit;
+    float acErrorLimit;
+    pt1Filter_t acLpf[XYZ_AXIS_COUNT];
+    float oldSetpointCorrection[XYZ_AXIS_COUNT];
+#endif
+
+#ifdef USE_D_MAX
+    pt2Filter_t dMaxRange[XYZ_AXIS_COUNT];
+    pt2Filter_t dMaxLowpass[XYZ_AXIS_COUNT];
+    float dMaxPercent[XYZ_AXIS_COUNT];
+    uint8_t dMax[XYZ_AXIS_COUNT];
+    float dMaxGyroGain;
+    float dMaxSetpointGain;
+#endif
+
+#ifdef USE_AIRMODE_LPF
+    pt1Filter_t airmodeThrottleLpf1;
+    pt1Filter_t airmodeThrottleLpf2;
+    float airmodeThrottleOffsetLimit;
+#endif
+
+#ifdef USE_ACRO_TRAINER
+    float acroTrainerAngleLimit;
+    float acroTrainerLookaheadTime;
+    uint8_t acroTrainerDebugAxis;
+    float acroTrainerGain;
+    bool acroTrainerActive;
+    int acroTrainerAxisState[RP_AXIS_COUNT];
+#endif
+
+#ifdef USE_DYN_LPF
+    uint8_t dynLpfFilter;
+    uint16_t dynLpfMin;
+    uint16_t dynLpfMax;
+    uint8_t dynLpfCurveExpo;
+#endif
+
+#ifdef USE_LAUNCH_CONTROL
+    uint8_t launchControlMode;
+    uint8_t launchControlAngleLimit;
+    float launchControlKi;
+#endif
+
+#ifdef USE_INTEGRATED_YAW_CONTROL
+    bool useIntegratedYaw;
+    uint8_t integratedYawRelax;
+#endif
+
+#ifdef USE_THRUST_LINEARIZATION
+    float thrustLinearization;
+    float throttleCompensateAmount;
+#endif
+
+#ifdef USE_FEEDFORWARD
+    feedforwardAveraging_t feedforwardAveraging;
+    float feedforwardSmoothFactor;
+    uint8_t feedforwardJitterFactor;
+    float feedforwardJitterFactorInv;
+    float feedforwardBoostFactor;
+    float feedforwardTransition;
+    float feedforwardTransitionInv;
+    uint8_t feedforwardMaxRateLimit;
+    float feedforwardYawHoldGain;
+    float feedforwardYawHoldTime;
+    bool feedforwardInterpolate;
+    pt3Filter_t angleFeedforwardPt3[XYZ_AXIS_COUNT];
+#endif
+
+#ifdef USE_ACC
+    pt3Filter_t attitudeFilter[RP_AXIS_COUNT];
+    pt1Filter_t horizonSmoothingPt1;
+    uint16_t horizonDelayMs;
+    float angleYawSetpoint;
+    float angleEarthRef;
+    float angleTarget[RP_AXIS_COUNT];
+    bool axisInAngleMode[3];
+#endif
+
+#ifdef USE_WING
+    float spa[XYZ_AXIS_COUNT];
+    tpaSpeedParams_t tpaSpeed;
+    float tpaFactorYaw;
+    float tpaFactorSterm[XYZ_AXIS_COUNT];
+#endif
+
+#ifdef USE_ADVANCED_TPA
+    pwl_t tpaCurvePwl;
+    float tpaCurvePwl_yValues[TPA_CURVE_PWL_SIZE];
+    tpaCurveType_t tpaCurveType;
+#endif
+
+#ifdef USE_CHIRP
+    chirp_t chirp;
+    phaseComp_t chirpFilter;
+    float chirpLagFreqHz;
+    float chirpLeadFreqHz;
+    float chirpAmplitude[3];
+    float chirpFrequencyStartHz;
+    float chirpFrequencyEndHz;
+    float chirpTimeSeconds;
+#endif
+} kf_pid_runtime_state_t;
+
+typedef struct kf_gyro_state_s {
+    float gyroADC[XYZ_AXIS_COUNT];
+    float gyroADCf[XYZ_AXIS_COUNT];
+    uint8_t sampleCount;
+    float sampleSum[XYZ_AXIS_COUNT];
+    bool downsampleFilterEnabled;
+    gyroCalibration_t calibration[GYRO_COUNT];
+    gyroLowpassFilter_t lowpassFilter[XYZ_AXIS_COUNT];
+    gyroLowpassFilter_t lowpass2Filter[XYZ_AXIS_COUNT];
+    biquadFilter_t notchFilter1[XYZ_AXIS_COUNT];
+    biquadFilter_t notchFilter2[XYZ_AXIS_COUNT];
+    pt1Filter_t imuGyroFilter[XYZ_AXIS_COUNT];
+    uint8_t gyroEnabledBitmask;
+    uint8_t gyroDebugMode;
+    bool gyroHasOverflowProtection;
+    bool useMultiGyroDebugging;
+    flight_dynamics_index_t gyroDebugAxis;
+#ifdef USE_DYN_LPF
+    uint8_t dynLpfFilter;
+    uint16_t dynLpfMin;
+    uint16_t dynLpfMax;
+    uint8_t dynLpfCurveExpo;
+#endif
+#ifdef USE_GYRO_OVERFLOW_CHECK
+    uint8_t overflowAxisMask;
+#endif
+} kf_gyro_state_t;
+
+typedef struct kf_acc_state_s {
+    vector3_t accADC;
+    vector3_t jerk;
+    float accMagnitude;
+    float jerkMagnitude;
+    bool isAccelUpdatedAtLeastOnce;
+} kf_acc_state_t;
+
+typedef struct kf_reconcile_state_s {
+    uint64_t externalFrame;
+    uint32_t targetPidLooptime;
+    uint8_t activePidLoopDenom;
+    pidAxisData_t pidData[XYZ_AXIS_COUNT];
+    kf_pid_runtime_state_t pidRuntime;
+    kf_gyro_state_t gyro;
+    kf_acc_state_t acc;
+    attitudeEulerAngles_t attitude;
+    quaternion_t imuAttitudeQuaternion;
+    quaternion_t headfree;
+    quaternion_t offset;
+    bool canUseGPSHeading;
+    float rcCommand[PRIMARY_CHANNEL_COUNT];
+    rcSmoothingFilter_t rcSmoothing;
+#ifdef USE_THROTTLE_BOOST
+    float throttleBoost;
+    pt1Filter_t throttleLpf;
+#endif
+} kf_reconcile_state_t;
+
+static void kf_write_pid_runtime_state(kf_pid_runtime_state_t *const dst)
+{
+    KF_COPY_FIELD(dst, &pidRuntime, dT);
+    KF_COPY_FIELD(dst, &pidRuntime, pidFrequency);
+    KF_COPY_FIELD(dst, &pidRuntime, pidStabilisationEnabled);
+    KF_COPY_ARRAY(dst, &pidRuntime, previousPidSetpoint);
+    KF_COPY_ARRAY(dst, &pidRuntime, dtermNotch);
+    KF_COPY_ARRAY(dst, &pidRuntime, dtermLowpass);
+    KF_COPY_ARRAY(dst, &pidRuntime, dtermLowpass2);
+    KF_COPY_FIELD(dst, &pidRuntime, ptermYawLowpass);
+    KF_COPY_FIELD(dst, &pidRuntime, antiGravityEnabled);
+    KF_COPY_FIELD(dst, &pidRuntime, antiGravityLpf);
+    KF_COPY_FIELD(dst, &pidRuntime, antiGravityOsdCutoff);
+    KF_COPY_FIELD(dst, &pidRuntime, antiGravityThrottleD);
+    KF_COPY_FIELD(dst, &pidRuntime, itermAccelerator);
+    KF_COPY_FIELD(dst, &pidRuntime, antiGravityGain);
+    KF_COPY_FIELD(dst, &pidRuntime, antiGravityPGain);
+    KF_COPY_ARRAY(dst, &pidRuntime, pidCoefficient);
+    KF_COPY_FIELD(dst, &pidRuntime, angleGain);
+    KF_COPY_FIELD(dst, &pidRuntime, angleFeedforwardGain);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonGain);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonLimitSticks);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonLimitSticksInv);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonLimitDegrees);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonLimitDegreesInv);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonIgnoreSticks);
+    KF_COPY_ARRAY(dst, &pidRuntime, maxVelocity);
+    KF_COPY_FIELD(dst, &pidRuntime, inCrashRecoveryMode);
+    KF_COPY_FIELD(dst, &pidRuntime, crashDetectedAtUs);
+    KF_COPY_FIELD(dst, &pidRuntime, crashTimeLimitUs);
+    KF_COPY_FIELD(dst, &pidRuntime, crashTimeDelayUs);
+    KF_COPY_FIELD(dst, &pidRuntime, crashRecoveryAngleDeciDegrees);
+    KF_COPY_FIELD(dst, &pidRuntime, crashRecoveryRate);
+    KF_COPY_FIELD(dst, &pidRuntime, crashGyroThreshold);
+    KF_COPY_FIELD(dst, &pidRuntime, crashDtermThreshold);
+    KF_COPY_FIELD(dst, &pidRuntime, crashSetpointThreshold);
+    KF_COPY_FIELD(dst, &pidRuntime, crashLimitYaw);
+    KF_COPY_FIELD(dst, &pidRuntime, itermLimit);
+    KF_COPY_FIELD(dst, &pidRuntime, itermLimitYaw);
+    KF_COPY_FIELD(dst, &pidRuntime, itermRotation);
+    KF_COPY_FIELD(dst, &pidRuntime, zeroThrottleItermReset);
+    KF_COPY_FIELD(dst, &pidRuntime, levelRaceMode);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaFactor);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaBreakpoint);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaMultiplier);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaLowBreakpoint);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaLowMultiplier);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaLowAlways);
+    KF_COPY_FIELD(dst, &pidRuntime, useEzDisarm);
+    KF_COPY_FIELD(dst, &pidRuntime, landingDisarmThreshold);
+
+#ifdef USE_ITERM_RELAX
+    KF_COPY_ARRAY(dst, &pidRuntime, windupLpf);
+    KF_COPY_FIELD(dst, &pidRuntime, itermRelax);
+    KF_COPY_FIELD(dst, &pidRuntime, itermRelaxType);
+    KF_COPY_FIELD(dst, &pidRuntime, itermRelaxCutoff);
+#endif
+
+#ifdef USE_ABSOLUTE_CONTROL
+    KF_COPY_FIELD(dst, &pidRuntime, acCutoff);
+    KF_COPY_FIELD(dst, &pidRuntime, acGain);
+    KF_COPY_FIELD(dst, &pidRuntime, acLimit);
+    KF_COPY_FIELD(dst, &pidRuntime, acErrorLimit);
+    KF_COPY_ARRAY(dst, &pidRuntime, acLpf);
+    KF_COPY_ARRAY(dst, &pidRuntime, oldSetpointCorrection);
+#endif
+
+#ifdef USE_D_MAX
+    KF_COPY_ARRAY(dst, &pidRuntime, dMaxRange);
+    KF_COPY_ARRAY(dst, &pidRuntime, dMaxLowpass);
+    KF_COPY_ARRAY(dst, &pidRuntime, dMaxPercent);
+    KF_COPY_ARRAY(dst, &pidRuntime, dMax);
+    KF_COPY_FIELD(dst, &pidRuntime, dMaxGyroGain);
+    KF_COPY_FIELD(dst, &pidRuntime, dMaxSetpointGain);
+#endif
+
+#ifdef USE_AIRMODE_LPF
+    KF_COPY_FIELD(dst, &pidRuntime, airmodeThrottleLpf1);
+    KF_COPY_FIELD(dst, &pidRuntime, airmodeThrottleLpf2);
+    KF_COPY_FIELD(dst, &pidRuntime, airmodeThrottleOffsetLimit);
+#endif
+
+#ifdef USE_ACRO_TRAINER
+    KF_COPY_FIELD(dst, &pidRuntime, acroTrainerAngleLimit);
+    KF_COPY_FIELD(dst, &pidRuntime, acroTrainerLookaheadTime);
+    KF_COPY_FIELD(dst, &pidRuntime, acroTrainerDebugAxis);
+    KF_COPY_FIELD(dst, &pidRuntime, acroTrainerGain);
+    KF_COPY_FIELD(dst, &pidRuntime, acroTrainerActive);
+    KF_COPY_ARRAY(dst, &pidRuntime, acroTrainerAxisState);
+#endif
+
+#ifdef USE_DYN_LPF
+    KF_COPY_FIELD(dst, &pidRuntime, dynLpfFilter);
+    KF_COPY_FIELD(dst, &pidRuntime, dynLpfMin);
+    KF_COPY_FIELD(dst, &pidRuntime, dynLpfMax);
+    KF_COPY_FIELD(dst, &pidRuntime, dynLpfCurveExpo);
+#endif
+
+#ifdef USE_LAUNCH_CONTROL
+    KF_COPY_FIELD(dst, &pidRuntime, launchControlMode);
+    KF_COPY_FIELD(dst, &pidRuntime, launchControlAngleLimit);
+    KF_COPY_FIELD(dst, &pidRuntime, launchControlKi);
+#endif
+
+#ifdef USE_INTEGRATED_YAW_CONTROL
+    KF_COPY_FIELD(dst, &pidRuntime, useIntegratedYaw);
+    KF_COPY_FIELD(dst, &pidRuntime, integratedYawRelax);
+#endif
+
+#ifdef USE_THRUST_LINEARIZATION
+    KF_COPY_FIELD(dst, &pidRuntime, thrustLinearization);
+    KF_COPY_FIELD(dst, &pidRuntime, throttleCompensateAmount);
+#endif
+
+#ifdef USE_FEEDFORWARD
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardAveraging);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardSmoothFactor);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardJitterFactor);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardJitterFactorInv);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardBoostFactor);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardTransition);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardTransitionInv);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardMaxRateLimit);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardYawHoldGain);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardYawHoldTime);
+    KF_COPY_FIELD(dst, &pidRuntime, feedforwardInterpolate);
+    KF_COPY_ARRAY(dst, &pidRuntime, angleFeedforwardPt3);
+#endif
+
+#ifdef USE_ACC
+    KF_COPY_ARRAY(dst, &pidRuntime, attitudeFilter);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonSmoothingPt1);
+    KF_COPY_FIELD(dst, &pidRuntime, horizonDelayMs);
+    KF_COPY_FIELD(dst, &pidRuntime, angleYawSetpoint);
+    KF_COPY_FIELD(dst, &pidRuntime, angleEarthRef);
+    KF_COPY_ARRAY(dst, &pidRuntime, angleTarget);
+    KF_COPY_ARRAY(dst, &pidRuntime, axisInAngleMode);
+#endif
+
+#ifdef USE_WING
+    KF_COPY_ARRAY(dst, &pidRuntime, spa);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaSpeed);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaFactorYaw);
+    KF_COPY_ARRAY(dst, &pidRuntime, tpaFactorSterm);
+#endif
+
+#ifdef USE_ADVANCED_TPA
+    KF_COPY_FIELD(dst, &pidRuntime, tpaCurvePwl);
+    KF_COPY_ARRAY(dst, &pidRuntime, tpaCurvePwl_yValues);
+    KF_COPY_FIELD(dst, &pidRuntime, tpaCurveType);
+#endif
+
+#ifdef USE_CHIRP
+    KF_COPY_FIELD(dst, &pidRuntime, chirp);
+    KF_COPY_FIELD(dst, &pidRuntime, chirpFilter);
+    KF_COPY_FIELD(dst, &pidRuntime, chirpLagFreqHz);
+    KF_COPY_FIELD(dst, &pidRuntime, chirpLeadFreqHz);
+    KF_COPY_ARRAY(dst, &pidRuntime, chirpAmplitude);
+    KF_COPY_FIELD(dst, &pidRuntime, chirpFrequencyStartHz);
+    KF_COPY_FIELD(dst, &pidRuntime, chirpFrequencyEndHz);
+    KF_COPY_FIELD(dst, &pidRuntime, chirpTimeSeconds);
+#endif
+}
+
+static void kf_read_pid_runtime_state(const kf_pid_runtime_state_t *const src)
+{
+    KF_COPY_FIELD(&pidRuntime, src, dT);
+    KF_COPY_FIELD(&pidRuntime, src, pidFrequency);
+    KF_COPY_FIELD(&pidRuntime, src, pidStabilisationEnabled);
+    KF_COPY_ARRAY(&pidRuntime, src, previousPidSetpoint);
+    KF_COPY_ARRAY(&pidRuntime, src, dtermNotch);
+    KF_COPY_ARRAY(&pidRuntime, src, dtermLowpass);
+    KF_COPY_ARRAY(&pidRuntime, src, dtermLowpass2);
+    KF_COPY_FIELD(&pidRuntime, src, ptermYawLowpass);
+    KF_COPY_FIELD(&pidRuntime, src, antiGravityEnabled);
+    KF_COPY_FIELD(&pidRuntime, src, antiGravityLpf);
+    KF_COPY_FIELD(&pidRuntime, src, antiGravityOsdCutoff);
+    KF_COPY_FIELD(&pidRuntime, src, antiGravityThrottleD);
+    KF_COPY_FIELD(&pidRuntime, src, itermAccelerator);
+    KF_COPY_FIELD(&pidRuntime, src, antiGravityGain);
+    KF_COPY_FIELD(&pidRuntime, src, antiGravityPGain);
+    KF_COPY_ARRAY(&pidRuntime, src, pidCoefficient);
+    KF_COPY_FIELD(&pidRuntime, src, angleGain);
+    KF_COPY_FIELD(&pidRuntime, src, angleFeedforwardGain);
+    KF_COPY_FIELD(&pidRuntime, src, horizonGain);
+    KF_COPY_FIELD(&pidRuntime, src, horizonLimitSticks);
+    KF_COPY_FIELD(&pidRuntime, src, horizonLimitSticksInv);
+    KF_COPY_FIELD(&pidRuntime, src, horizonLimitDegrees);
+    KF_COPY_FIELD(&pidRuntime, src, horizonLimitDegreesInv);
+    KF_COPY_FIELD(&pidRuntime, src, horizonIgnoreSticks);
+    KF_COPY_ARRAY(&pidRuntime, src, maxVelocity);
+    KF_COPY_FIELD(&pidRuntime, src, inCrashRecoveryMode);
+    KF_COPY_FIELD(&pidRuntime, src, crashDetectedAtUs);
+    KF_COPY_FIELD(&pidRuntime, src, crashTimeLimitUs);
+    KF_COPY_FIELD(&pidRuntime, src, crashTimeDelayUs);
+    KF_COPY_FIELD(&pidRuntime, src, crashRecoveryAngleDeciDegrees);
+    KF_COPY_FIELD(&pidRuntime, src, crashRecoveryRate);
+    KF_COPY_FIELD(&pidRuntime, src, crashGyroThreshold);
+    KF_COPY_FIELD(&pidRuntime, src, crashDtermThreshold);
+    KF_COPY_FIELD(&pidRuntime, src, crashSetpointThreshold);
+    KF_COPY_FIELD(&pidRuntime, src, crashLimitYaw);
+    KF_COPY_FIELD(&pidRuntime, src, itermLimit);
+    KF_COPY_FIELD(&pidRuntime, src, itermLimitYaw);
+    KF_COPY_FIELD(&pidRuntime, src, itermRotation);
+    KF_COPY_FIELD(&pidRuntime, src, zeroThrottleItermReset);
+    KF_COPY_FIELD(&pidRuntime, src, levelRaceMode);
+    KF_COPY_FIELD(&pidRuntime, src, tpaFactor);
+    KF_COPY_FIELD(&pidRuntime, src, tpaBreakpoint);
+    KF_COPY_FIELD(&pidRuntime, src, tpaMultiplier);
+    KF_COPY_FIELD(&pidRuntime, src, tpaLowBreakpoint);
+    KF_COPY_FIELD(&pidRuntime, src, tpaLowMultiplier);
+    KF_COPY_FIELD(&pidRuntime, src, tpaLowAlways);
+    KF_COPY_FIELD(&pidRuntime, src, useEzDisarm);
+    KF_COPY_FIELD(&pidRuntime, src, landingDisarmThreshold);
+
+#ifdef USE_ITERM_RELAX
+    KF_COPY_ARRAY(&pidRuntime, src, windupLpf);
+    KF_COPY_FIELD(&pidRuntime, src, itermRelax);
+    KF_COPY_FIELD(&pidRuntime, src, itermRelaxType);
+    KF_COPY_FIELD(&pidRuntime, src, itermRelaxCutoff);
+#endif
+
+#ifdef USE_ABSOLUTE_CONTROL
+    KF_COPY_FIELD(&pidRuntime, src, acCutoff);
+    KF_COPY_FIELD(&pidRuntime, src, acGain);
+    KF_COPY_FIELD(&pidRuntime, src, acLimit);
+    KF_COPY_FIELD(&pidRuntime, src, acErrorLimit);
+    KF_COPY_ARRAY(&pidRuntime, src, acLpf);
+    KF_COPY_ARRAY(&pidRuntime, src, oldSetpointCorrection);
+#endif
+
+#ifdef USE_D_MAX
+    KF_COPY_ARRAY(&pidRuntime, src, dMaxRange);
+    KF_COPY_ARRAY(&pidRuntime, src, dMaxLowpass);
+    KF_COPY_ARRAY(&pidRuntime, src, dMaxPercent);
+    KF_COPY_ARRAY(&pidRuntime, src, dMax);
+    KF_COPY_FIELD(&pidRuntime, src, dMaxGyroGain);
+    KF_COPY_FIELD(&pidRuntime, src, dMaxSetpointGain);
+#endif
+
+#ifdef USE_AIRMODE_LPF
+    KF_COPY_FIELD(&pidRuntime, src, airmodeThrottleLpf1);
+    KF_COPY_FIELD(&pidRuntime, src, airmodeThrottleLpf2);
+    KF_COPY_FIELD(&pidRuntime, src, airmodeThrottleOffsetLimit);
+#endif
+
+#ifdef USE_ACRO_TRAINER
+    KF_COPY_FIELD(&pidRuntime, src, acroTrainerAngleLimit);
+    KF_COPY_FIELD(&pidRuntime, src, acroTrainerLookaheadTime);
+    KF_COPY_FIELD(&pidRuntime, src, acroTrainerDebugAxis);
+    KF_COPY_FIELD(&pidRuntime, src, acroTrainerGain);
+    KF_COPY_FIELD(&pidRuntime, src, acroTrainerActive);
+    KF_COPY_ARRAY(&pidRuntime, src, acroTrainerAxisState);
+#endif
+
+#ifdef USE_DYN_LPF
+    KF_COPY_FIELD(&pidRuntime, src, dynLpfFilter);
+    KF_COPY_FIELD(&pidRuntime, src, dynLpfMin);
+    KF_COPY_FIELD(&pidRuntime, src, dynLpfMax);
+    KF_COPY_FIELD(&pidRuntime, src, dynLpfCurveExpo);
+#endif
+
+#ifdef USE_LAUNCH_CONTROL
+    KF_COPY_FIELD(&pidRuntime, src, launchControlMode);
+    KF_COPY_FIELD(&pidRuntime, src, launchControlAngleLimit);
+    KF_COPY_FIELD(&pidRuntime, src, launchControlKi);
+#endif
+
+#ifdef USE_INTEGRATED_YAW_CONTROL
+    KF_COPY_FIELD(&pidRuntime, src, useIntegratedYaw);
+    KF_COPY_FIELD(&pidRuntime, src, integratedYawRelax);
+#endif
+
+#ifdef USE_THRUST_LINEARIZATION
+    KF_COPY_FIELD(&pidRuntime, src, thrustLinearization);
+    KF_COPY_FIELD(&pidRuntime, src, throttleCompensateAmount);
+#endif
+
+#ifdef USE_FEEDFORWARD
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardAveraging);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardSmoothFactor);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardJitterFactor);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardJitterFactorInv);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardBoostFactor);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardTransition);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardTransitionInv);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardMaxRateLimit);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardYawHoldGain);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardYawHoldTime);
+    KF_COPY_FIELD(&pidRuntime, src, feedforwardInterpolate);
+    KF_COPY_ARRAY(&pidRuntime, src, angleFeedforwardPt3);
+#endif
+
+#ifdef USE_ACC
+    KF_COPY_ARRAY(&pidRuntime, src, attitudeFilter);
+    KF_COPY_FIELD(&pidRuntime, src, horizonSmoothingPt1);
+    KF_COPY_FIELD(&pidRuntime, src, horizonDelayMs);
+    KF_COPY_FIELD(&pidRuntime, src, angleYawSetpoint);
+    KF_COPY_FIELD(&pidRuntime, src, angleEarthRef);
+    KF_COPY_ARRAY(&pidRuntime, src, angleTarget);
+    KF_COPY_ARRAY(&pidRuntime, src, axisInAngleMode);
+#endif
+
+#ifdef USE_WING
+    KF_COPY_ARRAY(&pidRuntime, src, spa);
+    KF_COPY_FIELD(&pidRuntime, src, tpaSpeed);
+    KF_COPY_FIELD(&pidRuntime, src, tpaFactorYaw);
+    KF_COPY_ARRAY(&pidRuntime, src, tpaFactorSterm);
+#endif
+
+#ifdef USE_ADVANCED_TPA
+    KF_COPY_FIELD(&pidRuntime, src, tpaCurvePwl);
+    KF_COPY_ARRAY(&pidRuntime, src, tpaCurvePwl_yValues);
+    KF_COPY_FIELD(&pidRuntime, src, tpaCurveType);
+#endif
+
+#ifdef USE_CHIRP
+    KF_COPY_FIELD(&pidRuntime, src, chirp);
+    KF_COPY_FIELD(&pidRuntime, src, chirpFilter);
+    KF_COPY_FIELD(&pidRuntime, src, chirpLagFreqHz);
+    KF_COPY_FIELD(&pidRuntime, src, chirpLeadFreqHz);
+    KF_COPY_ARRAY(&pidRuntime, src, chirpAmplitude);
+    KF_COPY_FIELD(&pidRuntime, src, chirpFrequencyStartHz);
+    KF_COPY_FIELD(&pidRuntime, src, chirpFrequencyEndHz);
+    KF_COPY_FIELD(&pidRuntime, src, chirpTimeSeconds);
+#endif
+}
+
+static void kf_write_gyro_state(kf_gyro_state_t *const dst)
+{
+    KF_COPY_ARRAY(dst, &gyro, gyroADC);
+    KF_COPY_ARRAY(dst, &gyro, gyroADCf);
+    KF_COPY_FIELD(dst, &gyro, sampleCount);
+    KF_COPY_ARRAY(dst, &gyro, sampleSum);
+    KF_COPY_FIELD(dst, &gyro, downsampleFilterEnabled);
+    for (int i = 0; i < GYRO_COUNT; ++i) {
+        dst->calibration[i] = gyro.gyroSensor[i].calibration;
+    }
+    KF_COPY_ARRAY(dst, &gyro, lowpassFilter);
+    KF_COPY_ARRAY(dst, &gyro, lowpass2Filter);
+    KF_COPY_ARRAY(dst, &gyro, notchFilter1);
+    KF_COPY_ARRAY(dst, &gyro, notchFilter2);
+    KF_COPY_ARRAY(dst, &gyro, imuGyroFilter);
+    KF_COPY_FIELD(dst, &gyro, gyroEnabledBitmask);
+    KF_COPY_FIELD(dst, &gyro, gyroDebugMode);
+    KF_COPY_FIELD(dst, &gyro, gyroHasOverflowProtection);
+    KF_COPY_FIELD(dst, &gyro, useMultiGyroDebugging);
+    KF_COPY_FIELD(dst, &gyro, gyroDebugAxis);
+#ifdef USE_DYN_LPF
+    KF_COPY_FIELD(dst, &gyro, dynLpfFilter);
+    KF_COPY_FIELD(dst, &gyro, dynLpfMin);
+    KF_COPY_FIELD(dst, &gyro, dynLpfMax);
+    KF_COPY_FIELD(dst, &gyro, dynLpfCurveExpo);
+#endif
+#ifdef USE_GYRO_OVERFLOW_CHECK
+    KF_COPY_FIELD(dst, &gyro, overflowAxisMask);
+#endif
+}
+
+static void kf_read_gyro_state(const kf_gyro_state_t *const src)
+{
+    KF_COPY_ARRAY(&gyro, src, gyroADC);
+    KF_COPY_ARRAY(&gyro, src, gyroADCf);
+    KF_COPY_FIELD(&gyro, src, sampleCount);
+    KF_COPY_ARRAY(&gyro, src, sampleSum);
+    KF_COPY_FIELD(&gyro, src, downsampleFilterEnabled);
+    for (int i = 0; i < GYRO_COUNT; ++i) {
+        gyro.gyroSensor[i].calibration = src->calibration[i];
+    }
+    KF_COPY_ARRAY(&gyro, src, lowpassFilter);
+    KF_COPY_ARRAY(&gyro, src, lowpass2Filter);
+    KF_COPY_ARRAY(&gyro, src, notchFilter1);
+    KF_COPY_ARRAY(&gyro, src, notchFilter2);
+    KF_COPY_ARRAY(&gyro, src, imuGyroFilter);
+    KF_COPY_FIELD(&gyro, src, gyroEnabledBitmask);
+    KF_COPY_FIELD(&gyro, src, gyroDebugMode);
+    KF_COPY_FIELD(&gyro, src, gyroHasOverflowProtection);
+    KF_COPY_FIELD(&gyro, src, useMultiGyroDebugging);
+    KF_COPY_FIELD(&gyro, src, gyroDebugAxis);
+#ifdef USE_DYN_LPF
+    KF_COPY_FIELD(&gyro, src, dynLpfFilter);
+    KF_COPY_FIELD(&gyro, src, dynLpfMin);
+    KF_COPY_FIELD(&gyro, src, dynLpfMax);
+    KF_COPY_FIELD(&gyro, src, dynLpfCurveExpo);
+#endif
+#ifdef USE_GYRO_OVERFLOW_CHECK
+    KF_COPY_FIELD(&gyro, src, overflowAxisMask);
+#endif
+}
+
+static void kf_write_acc_state(kf_acc_state_t *const dst)
+{
+    KF_COPY_FIELD(dst, &acc, accADC);
+    KF_COPY_FIELD(dst, &acc, jerk);
+    KF_COPY_FIELD(dst, &acc, accMagnitude);
+    KF_COPY_FIELD(dst, &acc, jerkMagnitude);
+    KF_COPY_FIELD(dst, &acc, isAccelUpdatedAtLeastOnce);
+}
+
+static void kf_read_acc_state(const kf_acc_state_t *const src)
+{
+    KF_COPY_FIELD(&acc, src, accADC);
+    KF_COPY_FIELD(&acc, src, jerk);
+    KF_COPY_FIELD(&acc, src, accMagnitude);
+    KF_COPY_FIELD(&acc, src, jerkMagnitude);
+    KF_COPY_FIELD(&acc, src, isAccelUpdatedAtLeastOnce);
+}
+
+KF_EXPORT uint32_t kf_reconcile_output(void *out_state, const uint32_t out_size)
+{
+    const uint32_t required = (uint32_t)sizeof(kf_reconcile_state_t);
+
+    // Passing NULL gives us the required size
+    if (!out_state) {
+        return required;
+    }
+    KF_ASSERT_BASIC(out_size == required);
+
+    kf_reconcile_state_t *state = (kf_reconcile_state_t *)out_state;
+    memset(state, 0, required);
+
+    state->externalFrame = externalFrame;
+    state->targetPidLooptime = targetPidLooptime;
+    state->activePidLoopDenom = activePidLoopDenom;
+    memcpy(state->pidData, pidData, sizeof(state->pidData));
+    kf_write_pid_runtime_state(&state->pidRuntime);
+    kf_write_gyro_state(&state->gyro);
+    kf_write_acc_state(&state->acc);
+    state->attitude = attitude;
+    state->imuAttitudeQuaternion = imuAttitudeQuaternion;
+    state->headfree = headfree;
+    state->offset = offset;
+    state->canUseGPSHeading = canUseGPSHeading;
+    memcpy(state->rcCommand, rcCommand, sizeof(state->rcCommand));
+
+    rcSmoothingFilter_t *smoothing = getRcSmoothingData();
+    if (smoothing) {
+        state->rcSmoothing = *smoothing;
+    }
+
+#ifdef USE_THROTTLE_BOOST
+    state->throttleBoost = throttleBoost;
+    state->throttleLpf = throttleLpf;
+#endif
+
+    return required;
+}
+
+KF_EXPORT uint32_t kf_reconcile_input(const void *in_state, const uint32_t in_size)
+{
+    KF_ASSERT_BASIC(in_state);
+
+    const kf_reconcile_state_t *state = (const kf_reconcile_state_t *)in_state;
+    KF_ASSERT_BASIC(in_size == sizeof(*state));
+
+    externalFrame = state->externalFrame;
+    targetPidLooptime = state->targetPidLooptime;
+    activePidLoopDenom = state->activePidLoopDenom;
+    memcpy(pidData, state->pidData, sizeof(state->pidData));
+    kf_read_pid_runtime_state(&state->pidRuntime);
+    kf_read_gyro_state(&state->gyro);
+    kf_read_acc_state(&state->acc);
+
+    imuSetAttitudeQuat(state->imuAttitudeQuaternion.w,
+                       state->imuAttitudeQuaternion.x,
+                       state->imuAttitudeQuaternion.y,
+                       state->imuAttitudeQuaternion.z);
+    attitude = state->attitude;
+    imuAttitudeQuaternion = state->imuAttitudeQuaternion;
+    headfree = state->headfree;
+    offset = state->offset;
+    canUseGPSHeading = state->canUseGPSHeading;
+
+    memcpy(rcCommand, state->rcCommand, sizeof(state->rcCommand));
+    rcSmoothingFilter_t *smoothing = getRcSmoothingData();
+    if (smoothing) {
+        *smoothing = state->rcSmoothing;
+    }
+
+#ifdef USE_THROTTLE_BOOST
+    throttleBoost = state->throttleBoost;
+    throttleLpf = state->throttleLpf;
+#endif
+
+    return 1;
+}
 
 KF_EXPORT void kf_initialize(const void* eepromInData, const uint32_t eepromInSize) {
 #ifdef USE_FLUSH_IO
