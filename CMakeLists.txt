@@ -3,8 +3,8 @@ project(betaflight LANGUAGES C CXX VERSION 1)
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fenable-matrix")
-set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fenable-matrix")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -fenable-matrix")
+set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -fenable-matrix")
 
 set(CMAKE_SIZEOF_VOID_P 8)  # Enforces 64-bit pointer size
 
@@ -188,8 +188,8 @@ target_compile_options(betaflight_SITL PRIVATE
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message(STATUS "Configuring for a DEBUG build")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O0")
-  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O0")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+  set(  CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -O0")
   target_compile_definitions(betaflight_SITL PUBLIC
     USE_FLUSH_IO=
   )
