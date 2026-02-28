@@ -192,8 +192,10 @@ int nanosleep(const struct timespec *duration, struct timespec * rem) {
 
 extern uint64_t externalFrame;
 static uint64_t previousFrame = -1;
+static uint64_t frameBaseNs = 0;
 static uint64_t nsThisFrame = 0;
 static uint64_t nsAdvance = 0;
+static uint64_t nsTotalLast = 0;
 
 int nanosleep_override(const struct timespec *duration, struct timespec *rem) {
     nsThisFrame += duration->tv_sec * NS_PER_SEC;
@@ -206,8 +208,7 @@ int nanosleep_override(const struct timespec *duration, struct timespec *rem) {
     return 0;
 }
 
-uint64_t nsTotalLast = 0;
-int clock_gettime_override(clockid_t clk_id, struct timespec *tp) {
+uint64_t clock_gettime_nsec(void) {
     if (externalFrame == previousFrame) {
         nsThisFrame += NS_PER_CLOCK_GETTIME;
     } else {
@@ -222,9 +223,10 @@ int clock_gettime_override(clockid_t clk_id, struct timespec *tp) {
         }
 
         nsThisFrame = 0;
+        frameBaseNs = (externalFrame * NS_PER_FRAME) + nsAdvance;
     }
 
-    uint64_t nsTotal = (externalFrame * NS_PER_FRAME) + nsThisFrame + nsAdvance;
+    uint64_t nsTotal = frameBaseNs + nsThisFrame;
 
     if (nsTotal < nsTotalLast)
     {
@@ -234,10 +236,16 @@ int clock_gettime_override(clockid_t clk_id, struct timespec *tp) {
     }
 
     nsTotalLast = nsTotal;
+    return nsTotal;
+}
+
+int clock_gettime_override(clockid_t clk_id, struct timespec *tp) {
+    uint64_t nsTotal = clock_gettime_nsec();
+
+    UNUSED(clk_id);
 
     tp->tv_sec = nsTotal / NS_PER_SEC;
     tp->tv_nsec = nsTotal % NS_PER_SEC;
     return 0;
 }
 #endif
-

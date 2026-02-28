@@ -29,6 +29,7 @@
 #include <time.h>
 
 #include "common/maths.h"
+#include "common/utils.h"
 
 #include "build/debug.h"
 
@@ -464,27 +465,42 @@ void indicateFailure(failureMode_e mode, int repeatCount)
 // Thanks ArduPilot
 uint64_t nanos64_real(void)
 {
+#if defined(USE_DETERMINISM)
+    return clock_gettime_nsec();
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (ts.tv_sec*1e9 + ts.tv_nsec) - (start_time.tv_sec*1e9 + start_time.tv_nsec);
+#endif
 }
 
 uint64_t micros64_real(void)
 {
+#if defined(USE_DETERMINISM)
+    return nanos64_real() / 1000ULL;
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return 1.0e6*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - (start_time.tv_sec + (start_time.tv_nsec*1.0e-9)));
+#endif
 }
 
 uint64_t millis64_real(void)
 {
+#if defined(USE_DETERMINISM)
+    return nanos64_real() / (1000ULL * 1000ULL);
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return 1.0e3*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - (start_time.tv_sec + (start_time.tv_nsec*1.0e-9)));
+#endif
 }
 
 uint64_t micros64(void)
 {
+#if defined(USE_DETERMINISM)
+    return micros64_real();
+#else
     static uint64_t last = 0;
     static uint64_t out = 0;
     uint64_t now = nanos64_real();
@@ -493,10 +509,14 @@ uint64_t micros64(void)
     last = now;
 
     return out / 1000;
+#endif
 }
 
 uint64_t millis64(void)
 {
+#if defined(USE_DETERMINISM)
+    return millis64_real();
+#else
     static uint64_t last = 0;
     static uint64_t out = 0;
     uint64_t now = nanos64_real();
@@ -505,6 +525,7 @@ uint64_t millis64(void)
     last = now;
 
     return out / (1000 * 1000);
+#endif
 }
 
 uint32_t micros(void)

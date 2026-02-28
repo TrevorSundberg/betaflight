@@ -142,6 +142,7 @@ int nanosleep(const struct timespec *duration, struct timespec * rem);
 
 #if defined(USE_DETERMINISM)
 int nanosleep_override(const struct timespec *duration, struct timespec *rem);
+uint64_t clock_gettime_nsec(void);
 int clock_gettime_override(clockid_t clk_id, struct timespec *tp);
 #define nanosleep nanosleep_override
 #define clock_gettime clock_gettime_override
