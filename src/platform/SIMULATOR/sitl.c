@@ -1001,6 +1001,13 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
         rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
     }
 
+    uint32_t reconcileSize = firmware_states_get_reconcile_in_out_size(&flight_states->firmware_states, state_index);
+    if (reconcileSize != 0) {
+        const char *reconcileData = flight_states->firmware_states.reconcile_in_out[state_index];
+        kf_reconcile_input(reconcileData, reconcileSize);
+        firmware_states_set_reconcile_in_out_size(&flight_states->firmware_states, state_index, 0);
+    }
+
     for (uint32_t i = 0; i < iterations; ++i) {
         scheduler();
         ++externalFrame;
@@ -1018,6 +1025,12 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
 
     if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
         firmware_states_set_camera_angle_out(&flight_states->firmware_states, state_index, (char)rxConfig()->fpvCamAngleDegrees);
+
+        uint32_t reconcileOutputSize = kf_reconcile_output(NULL, 0);
+        KF_ASSERT_FORMAT(reconcileOutputSize <= KF_RECONCILE_IN_OUT_MAX_SIZE, "Unexpected reconcile output size: %u", reconcileOutputSize);
+        char *reconcileData = flight_states->firmware_states.reconcile_in_out[state_index];
+        kf_reconcile_output(reconcileData, reconcileOutputSize);
+        firmware_states_set_reconcile_in_out_size(&flight_states->firmware_states, state_index, reconcileOutputSize);
 
         if (saveEEPROM) {
             firmware_states_set_eeprom_out(&flight_states->firmware_states, state_index, eepromData);
