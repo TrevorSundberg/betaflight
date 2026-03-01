@@ -192,10 +192,60 @@ int nanosleep(const struct timespec *duration, struct timespec * rem) {
 
 extern uint64_t externalFrame;
 static uint64_t previousFrame = -1;
+static uint64_t previousMonotonicFrame = -1;
+static uint64_t rewindOffsetFrames = 0;
 static uint64_t frameBaseNs = 0;
 static uint64_t nsThisFrame = 0;
 static uint64_t nsAdvance = 0;
-static uint64_t nsTotalLast = 0;
+static uint64_t nsTotalMax = 0;
+static uint64_t reconcileFramesRemaining = 0;
+static uint64_t uiRewindNsPending = 0;
+
+bool determinismIsReconciling(void)
+{
+    return reconcileFramesRemaining > 0;
+}
+
+uint64_t determinismConsumeUiRewindNs(void)
+{
+    const uint64_t rewindNs = uiRewindNsPending;
+    uiRewindNsPending = 0;
+    return rewindNs;
+}
+
+void determinismOnExternalFrameAdvance(void)
+{
+    const uint64_t monotonicFrame = externalFrame + rewindOffsetFrames;
+
+    uint64_t framesAdvanced = 0;
+    if (previousMonotonicFrame != UINT64_MAX && monotonicFrame > previousMonotonicFrame) {
+        framesAdvanced = monotonicFrame - previousMonotonicFrame;
+    }
+
+    // Frame boundaries are tracked from SITL after scheduler() to ensure
+    // deterministic time advances even when reconciled frames are re-run.
+    uint64_t nsFramesAdvanced = NS_PER_FRAME * framesAdvanced;
+    if (nsThisFrame > nsFramesAdvanced) {
+        nsAdvance += nsThisFrame - nsFramesAdvanced;
+    }
+
+    previousFrame = externalFrame;
+    previousMonotonicFrame = monotonicFrame;
+    nsThisFrame = 0;
+    frameBaseNs = (monotonicFrame * NS_PER_FRAME) + nsAdvance;
+
+    if (frameBaseNs > nsTotalMax) {
+        nsTotalMax = frameBaseNs;
+    }
+
+    if (reconcileFramesRemaining > 0) {
+        if (framesAdvanced >= reconcileFramesRemaining) {
+            reconcileFramesRemaining = 0;
+        } else {
+            reconcileFramesRemaining -= framesAdvanced;
+        }
+    }
+}
 
 int nanosleep_override(const struct timespec *duration, struct timespec *rem) {
     nsThisFrame += duration->tv_sec * NS_PER_SEC;
@@ -212,8 +262,21 @@ uint64_t clock_gettime_nsec(void) {
     if (externalFrame == previousFrame) {
         nsThisFrame += NS_PER_CLOCK_GETTIME;
     } else {
-        uint32_t framesAdvanced = externalFrame - previousFrame;
+        const bool hasPreviousFrame = previousFrame != UINT64_MAX;
+        if (hasPreviousFrame && externalFrame < previousFrame) {
+            const uint64_t rewindFrames = previousFrame - externalFrame;
+            rewindOffsetFrames += rewindFrames;
+            reconcileFramesRemaining += rewindFrames;
+            uiRewindNsPending += rewindFrames * NS_PER_FRAME;
+        }
+
+        const uint64_t monotonicFrame = externalFrame + rewindOffsetFrames;
+        uint64_t framesAdvanced = 0;
+        if (previousMonotonicFrame != UINT64_MAX && monotonicFrame > previousMonotonicFrame) {
+            framesAdvanced = monotonicFrame - previousMonotonicFrame;
+        }
         previousFrame = externalFrame;
+        previousMonotonicFrame = monotonicFrame;
 
         // If we went past the typical budget for a frame, such as when delaying/waiting
         // then accumulate this advance in time by how much we went over
@@ -223,19 +286,22 @@ uint64_t clock_gettime_nsec(void) {
         }
 
         nsThisFrame = 0;
-        frameBaseNs = (externalFrame * NS_PER_FRAME) + nsAdvance;
+        frameBaseNs = (monotonicFrame * NS_PER_FRAME) + nsAdvance;
     }
 
     uint64_t nsTotal = frameBaseNs + nsThisFrame;
 
-    if (nsTotal < nsTotalLast)
-    {
-        printf("Total time went backwards %"PRIu64" %"PRIu64"\n", nsTotal, nsTotalLast);
-        fflush(stdout);
-        abort();
+    if (nsTotal < nsTotalMax) {
+        const uint64_t rewindNs = nsTotalMax - nsTotal;
+        const uint64_t deltaFrames = (rewindNs / NS_PER_FRAME) + 1;
+
+        rewindOffsetFrames += deltaFrames;
+        previousMonotonicFrame += deltaFrames;
+        frameBaseNs += deltaFrames * NS_PER_FRAME;
+        nsTotal = frameBaseNs + nsThisFrame;
     }
 
-    nsTotalLast = nsTotal;
+    nsTotalMax = nsTotal;
     return nsTotal;
 }
 

@@ -536,7 +536,7 @@ static timeUs_t osdGetTimerValue(osd_timer_source_e src)
 {
     switch (src) {
     case OSD_TIMER_SRC_ON:
-        return micros();
+        return osdGetUiTimeUs(micros());
     case OSD_TIMER_SRC_TOTAL_ARMED:
         return osdFlyTime;
     case OSD_TIMER_SRC_LAST_ARMED: {
@@ -544,7 +544,7 @@ static timeUs_t osdGetTimerValue(osd_timer_source_e src)
         return stats->armed_time;
     }
     case OSD_TIMER_SRC_ON_OR_ARMED:
-        return ARMING_FLAG(ARMED) ? osdFlyTime : micros();
+        return ARMING_FLAG(ARMED) ? osdFlyTime : osdGetUiTimeUs(micros());
     case OSD_TIMER_SRC_LAUNCH_TIME:
         return osdLaunchTime;
     default:

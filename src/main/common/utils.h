@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <time.h>
 #include <assert.h>
 #include "kongroth_flight.h"
@@ -144,7 +145,9 @@ int nanosleep(const struct timespec *duration, struct timespec * rem);
 int nanosleep_override(const struct timespec *duration, struct timespec *rem);
 uint64_t clock_gettime_nsec(void);
 int clock_gettime_override(clockid_t clk_id, struct timespec *tp);
+bool determinismIsReconciling(void);
+uint64_t determinismConsumeUiRewindNs(void);
+void determinismOnExternalFrameAdvance(void);
 #define nanosleep nanosleep_override
 #define clock_gettime clock_gettime_override
 #endif
-

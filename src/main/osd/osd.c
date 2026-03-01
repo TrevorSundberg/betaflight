@@ -1355,6 +1355,36 @@ osdState_e osdState = OSD_STATE_INIT;
 
 #define OSD_UPDATE_INTERVAL_US (1000000 / osdConfig()->framerate_hz)
 
+timeUs_t osdGetUiTimeUs(timeUs_t currentTimeUs)
+{
+#if defined(USE_DETERMINISM)
+    static int64_t osdTimeOffsetUs = 0;
+    static bool uiTimeFrozen = false;
+    static timeUs_t frozenUiTimeUs = 0;
+
+    const uint64_t rewindNs = determinismConsumeUiRewindNs();
+    if (rewindNs > 0) {
+        osdTimeOffsetUs -= (int64_t)(rewindNs / 1000ULL);
+    }
+
+    const int64_t adjustedUs = (int64_t)currentTimeUs + osdTimeOffsetUs;
+    const timeUs_t uiTimeUs = (adjustedUs >= 0) ? (timeUs_t)adjustedUs : 0;
+
+    if (determinismIsReconciling()) {
+        if (!uiTimeFrozen) {
+            frozenUiTimeUs = uiTimeUs;
+            uiTimeFrozen = true;
+        }
+        return frozenUiTimeUs;
+    }
+
+    uiTimeFrozen = false;
+    return uiTimeUs;
+#else
+    return currentTimeUs;
+#endif
+}
+
 // Called periodically by the scheduler
 bool osdUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 {
@@ -1387,6 +1417,7 @@ void osdUpdate(timeUs_t currentTimeUs)
     static uint16_t osdStateDurationFractionUs[OSD_STATE_COUNT] = { 0 };
     static uint32_t osdElementDurationFractionUs[OSD_ITEM_COUNT] = { 0 };
     static bool moreElementsToDraw;
+    const timeUs_t uiTimeUs = osdGetUiTimeUs(currentTimeUs);
 
     timeUs_t executeTimeUs;
     osdState_e osdCurrentState = osdState;
@@ -1433,7 +1464,7 @@ void osdUpdate(timeUs_t currentTimeUs)
 
     case OSD_STATE_PROCESS_STATS1:
         {
-            bool refreshStatsRequired = osdProcessStats1(currentTimeUs);
+            bool refreshStatsRequired = osdProcessStats1(uiTimeUs);
 
             if (refreshStatsRequired) {
                 osdState = OSD_STATE_REFRESH_STATS;
@@ -1451,7 +1482,7 @@ void osdUpdate(timeUs_t currentTimeUs)
             break;
         }
     case OSD_STATE_PROCESS_STATS2:
-        osdProcessStats2(currentTimeUs);
+        osdProcessStats2(uiTimeUs);
 
         osdState = OSD_STATE_PROCESS_STATS3;
         break;
@@ -1508,7 +1539,7 @@ void osdUpdate(timeUs_t currentTimeUs)
         }
 #endif // USE_GPS
 
-        osdSyncBlink(currentTimeUs);
+        osdSyncBlink(uiTimeUs);
 
         osdState = OSD_STATE_DRAW_ELEMENT;
 

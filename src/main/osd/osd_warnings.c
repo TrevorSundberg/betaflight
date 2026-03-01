@@ -70,7 +70,7 @@ const char CRASHFLIP_WARNING[] = ">CRASH FLIP<";
 void renderOsdWarning(char *warningText, bool *blinking, uint8_t *displayAttr)
 {
     const batteryState_e batteryState = getBatteryState();
-    const timeUs_t currentTimeUs = micros();
+    const timeUs_t currentTimeUs = osdGetUiTimeUs(micros());
 
     static timeUs_t armingDisabledUpdateTimeUs;
     static armingDisableFlags_e armingDisabledDisplayFlag = 0;

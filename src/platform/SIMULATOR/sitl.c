@@ -1014,6 +1014,9 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     for (uint32_t i = 0; i < iterations; ++i) {
         scheduler();
         ++externalFrame;
+#if defined(USE_DETERMINISM)
+        determinismOnExternalFrameAdvance();
+#endif
     }
 
     double outScale = 1000.0;
