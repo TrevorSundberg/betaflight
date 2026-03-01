@@ -823,6 +823,7 @@ typedef struct kf_reconcile_state_s {
     float throttleBoost;
     float throttleLpfState;
 #endif
+    uint64_t externalFrame;
 } kf_reconcile_state_t;
 
 KF_EXPORT uint32_t kf_reconcile_output(void *out_state, const uint32_t out_size)
@@ -865,6 +866,7 @@ KF_EXPORT uint32_t kf_reconcile_output(void *out_state, const uint32_t out_size)
     state->throttleBoost = throttleBoost;
     state->throttleLpfState = throttleLpf.state;
 #endif
+    state->externalFrame = externalFrame;
 
     return required;
 }
@@ -903,6 +905,7 @@ KF_EXPORT uint32_t kf_reconcile_input(const void *in_state, const uint32_t in_si
     throttleBoost = state->throttleBoost;
     throttleLpf.state = state->throttleLpfState;
 #endif
+    externalFrame = state->externalFrame;
 
     return 1;
 }
