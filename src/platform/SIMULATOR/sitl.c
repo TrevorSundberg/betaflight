@@ -802,29 +802,11 @@ extern pt1Filter_t throttleLpf;
 
 typedef struct kf_reconcile_state_s {
     float pidI[XYZ_AXIS_COUNT];
-    float pidSum[XYZ_AXIS_COUNT];
-    float prevPidSetpoint[XYZ_AXIS_COUNT];
-#ifdef USE_ABSOLUTE_CONTROL
-    float oldSetpointCorrection[XYZ_AXIS_COUNT];
-#endif
-#ifdef USE_ITERM_RELAX
-    float windupLpfState[XYZ_AXIS_COUNT];
-#endif
-    float itermAccelerator;
-    float antiGravityThrottleD;
-    float antiGravityLpfState;
-    float antiGravityLpfState1;
     float ptermYawLowpassState;
-#ifdef USE_AIRMODE_LPF
-    float airmodeThrottleLpf1State;
-    float airmodeThrottleLpf2State;
-#endif
-#ifdef USE_THROTTLE_BOOST
-    float throttleBoost;
-    float throttleLpfState;
-#endif
+    float previousGyroRateDterm[XYZ_AXIS_COUNT];
     uint64_t externalFrame;
 } kf_reconcile_state_t;
+STATIC_ASSERT(sizeof(kf_reconcile_state_t) == KF_RECONCILE_IN_OUT_MAX_SIZE, "Reconcile payload must match KF_RECONCILE_IN_OUT_MAX_SIZE exactly");
 
 KF_EXPORT uint32_t kf_reconcile_output(void *out_state, const uint32_t out_size)
 {
@@ -841,32 +823,14 @@ KF_EXPORT uint32_t kf_reconcile_output(void *out_state, const uint32_t out_size)
 
     for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
         state->pidI[axis] = pidData[axis].I;
-        state->pidSum[axis] = pidData[axis].Sum;
-        state->prevPidSetpoint[axis] = pidRuntime.previousPidSetpoint[axis];
-#ifdef USE_ABSOLUTE_CONTROL
-        state->oldSetpointCorrection[axis] = pidRuntime.oldSetpointCorrection[axis];
-#endif
-#ifdef USE_ITERM_RELAX
-        state->windupLpfState[axis] = pidRuntime.windupLpf[axis].state;
-#endif
     }
 
-    state->itermAccelerator = pidRuntime.itermAccelerator;
-    state->antiGravityThrottleD = pidRuntime.antiGravityThrottleD;
-    state->antiGravityLpfState = pidRuntime.antiGravityLpf.state;
-    state->antiGravityLpfState1 = pidRuntime.antiGravityLpf.state1;
     state->ptermYawLowpassState = pidRuntime.ptermYawLowpass.state;
-
-#ifdef USE_AIRMODE_LPF
-    state->airmodeThrottleLpf1State = pidRuntime.airmodeThrottleLpf1.state;
-    state->airmodeThrottleLpf2State = pidRuntime.airmodeThrottleLpf2.state;
-#endif
-
-#ifdef USE_THROTTLE_BOOST
-    state->throttleBoost = throttleBoost;
-    state->throttleLpfState = throttleLpf.state;
-#endif
     state->externalFrame = externalFrame;
+
+    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
+        state->previousGyroRateDterm[axis] = previousGyroRateDterm[axis];
+    }
 
     return required;
 }
@@ -880,32 +844,14 @@ KF_EXPORT uint32_t kf_reconcile_input(const void *in_state, const uint32_t in_si
 
     for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
         pidData[axis].I = state->pidI[axis];
-        pidData[axis].Sum = state->pidSum[axis];
-        pidRuntime.previousPidSetpoint[axis] = state->prevPidSetpoint[axis];
-#ifdef USE_ABSOLUTE_CONTROL
-        pidRuntime.oldSetpointCorrection[axis] = state->oldSetpointCorrection[axis];
-#endif
-#ifdef USE_ITERM_RELAX
-        pidRuntime.windupLpf[axis].state = state->windupLpfState[axis];
-#endif
     }
 
-    pidRuntime.itermAccelerator = state->itermAccelerator;
-    pidRuntime.antiGravityThrottleD = state->antiGravityThrottleD;
-    pidRuntime.antiGravityLpf.state = state->antiGravityLpfState;
-    pidRuntime.antiGravityLpf.state1 = state->antiGravityLpfState1;
     pidRuntime.ptermYawLowpass.state = state->ptermYawLowpassState;
-
-#ifdef USE_AIRMODE_LPF
-    pidRuntime.airmodeThrottleLpf1.state = state->airmodeThrottleLpf1State;
-    pidRuntime.airmodeThrottleLpf2.state = state->airmodeThrottleLpf2State;
-#endif
-
-#ifdef USE_THROTTLE_BOOST
-    throttleBoost = state->throttleBoost;
-    throttleLpf.state = state->throttleLpfState;
-#endif
     externalFrame = state->externalFrame;
+
+    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
+        previousGyroRateDterm[axis] = state->previousGyroRateDterm[axis];
+    }
 
     return 1;
 }

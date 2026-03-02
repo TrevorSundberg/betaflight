@@ -605,6 +605,8 @@ float pidGetPreviousSetpoint(int axis);
 float pidGetDT(void);
 float pidGetPidFrequency(void);
 
+extern float previousGyroRateDterm[XYZ_AXIS_COUNT];
+
 float dynLpfCutoffFreq(float throttle, uint16_t dynLpfMin, uint16_t dynLpfMax, uint8_t expo);
 #ifdef USE_CHIRP
 bool  pidChirpIsFinished();
