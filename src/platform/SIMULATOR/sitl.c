@@ -58,6 +58,7 @@
 #include "sensors/acceleration.h"
 #include "fc/rc.h"
 #include "fc/rc_controls.h"
+#include "fc/runtime_config.h"
 
 #include "config/feature.h"
 #include "config/config.h"
@@ -800,62 +801,6 @@ extern float throttleBoost;
 extern pt1Filter_t throttleLpf;
 #endif
 
-typedef struct kf_reconcile_state_s {
-    float pidI[XYZ_AXIS_COUNT];
-    float ptermYawLowpassState;
-    float previousGyroRateDterm[XYZ_AXIS_COUNT];
-    uint64_t externalFrame;
-} kf_reconcile_state_t;
-STATIC_ASSERT(sizeof(kf_reconcile_state_t) == KF_RECONCILE_IN_OUT_MAX_SIZE, "Reconcile payload must match KF_RECONCILE_IN_OUT_MAX_SIZE exactly");
-
-KF_EXPORT uint32_t kf_reconcile_output(void *out_state, const uint32_t out_size)
-{
-    const uint32_t required = (uint32_t)sizeof(kf_reconcile_state_t);
-
-    // Passing NULL gives us the required size
-    if (!out_state) {
-        return required;
-    }
-    KF_ASSERT_BASIC(out_size == required);
-
-    kf_reconcile_state_t *state = (kf_reconcile_state_t *)out_state;
-    memset(state, 0, required);
-
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
-        state->pidI[axis] = pidData[axis].I;
-    }
-
-    state->ptermYawLowpassState = pidRuntime.ptermYawLowpass.state;
-    state->externalFrame = externalFrame;
-
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
-        state->previousGyroRateDterm[axis] = previousGyroRateDterm[axis];
-    }
-
-    return required;
-}
-
-KF_EXPORT uint32_t kf_reconcile_input(const void *in_state, const uint32_t in_size)
-{
-    KF_ASSERT_BASIC(in_state);
-
-    const kf_reconcile_state_t *state = (const kf_reconcile_state_t *)in_state;
-    KF_ASSERT_BASIC(in_size == sizeof(*state));
-
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
-        pidData[axis].I = state->pidI[axis];
-    }
-
-    pidRuntime.ptermYawLowpass.state = state->ptermYawLowpassState;
-    externalFrame = state->externalFrame;
-
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
-        previousGyroRateDterm[axis] = state->previousGyroRateDterm[axis];
-    }
-
-    return 1;
-}
-
 KF_EXPORT void kf_initialize(const void* eepromInData, const uint32_t eepromInSize) {
 #ifdef USE_FLUSH_IO
     FILE* err = freopen("stdout.log", "w", stdout);
@@ -877,7 +822,7 @@ void set_channel(int channel, rc_packet* rcpkt, double value) {
     rcpkt->channels[channel] = pwm;
 }
 
-KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, struct flight_states *const flight_states, const uint32_t state_index) {
+KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, firmware_state *const state) {
     // Timestamp is only used for timeout and adjust sim speed which we don't want
     const double timestamp = 0;
 
@@ -885,12 +830,12 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
     rcpkt.timestamp = timestamp;
 
     // AETR1234
-    set_channel(0, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_ROLL));
-    set_channel(1, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_PITCH));
-    set_channel(2, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_THROTTLE));
-    set_channel(3, &rcpkt, controller_states_get_axis_command(&flight_states->controller_states, state_index, KF_AXIS_YAW));
-    set_channel(4, &rcpkt, controller_states_get_arm_command(&flight_states->controller_states, state_index));
-    set_channel(5, &rcpkt, controller_states_get_mode_command(&flight_states->controller_states, state_index));
+    set_channel(0, &rcpkt, state->channels[0]);
+    set_channel(1, &rcpkt, state->channels[1]);
+    set_channel(2, &rcpkt, state->channels[2]);
+    set_channel(3, &rcpkt, state->channels[3]);
+    set_channel(4, &rcpkt, state->channels[4]);
+    set_channel(5, &rcpkt, state->channels[5]);
     for (int i = 6; i < SIMULATOR_MAX_RC_CHANNELS; ++i) {
         rcpkt.channels[i] = rxConfig()->rx_min_usec;
     }
@@ -914,47 +859,37 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
 
     fdm_packet fdmpkt;
     fdmpkt.timestamp = timestamp;
-    fdmpkt.imu_angular_velocity_rpy[0] = -physics_states_get_angular_velocity_local(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.imu_angular_velocity_rpy[1] = -physics_states_get_angular_velocity_local(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.imu_angular_velocity_rpy[2] = +physics_states_get_angular_velocity_local(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.imu_angular_velocity_rpy[0] = -state->angular_velocity_local[KF_Z];
+    fdmpkt.imu_angular_velocity_rpy[1] = -state->angular_velocity_local[KF_X];
+    fdmpkt.imu_angular_velocity_rpy[2] = +state->angular_velocity_local[KF_Y];
 
-    fdmpkt.imu_linear_acceleration_xyz[0] = -physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.imu_linear_acceleration_xyz[1] = -physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.imu_linear_acceleration_xyz[2] = +physics_states_get_linear_acceleration_world(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.imu_linear_acceleration_xyz[0] = -state->linear_acceleration_world[KF_Z];
+    fdmpkt.imu_linear_acceleration_xyz[1] = -state->linear_acceleration_world[KF_X];
+    fdmpkt.imu_linear_acceleration_xyz[2] = +state->linear_acceleration_world[KF_Y];
 
-    fdmpkt.imu_orientation_quat[0] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_W);
-    fdmpkt.imu_orientation_quat[1] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.imu_orientation_quat[2] = -physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.imu_orientation_quat[3] = +physics_states_get_orientation_world(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.imu_orientation_quat[0] = +state->orientation_world[KF_W];
+    fdmpkt.imu_orientation_quat[1] = -state->orientation_world[KF_Z];
+    fdmpkt.imu_orientation_quat[2] = -state->orientation_world[KF_X];
+    fdmpkt.imu_orientation_quat[3] = +state->orientation_world[KF_Y];
 
-    fdmpkt.velocity_xyz[0] = -physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.velocity_xyz[1] = -physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.velocity_xyz[2] = +physics_states_get_linear_velocity_world(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.velocity_xyz[0] = -state->linear_velocity_world[KF_Z];
+    fdmpkt.velocity_xyz[1] = -state->linear_velocity_world[KF_X];
+    fdmpkt.velocity_xyz[2] = +state->linear_velocity_world[KF_Y];
 
-    fdmpkt.position_xyz[0] = -physics_states_get_position_world(&flight_states->physics_states, state_index, KF_Z);
-    fdmpkt.position_xyz[1] = -physics_states_get_position_world(&flight_states->physics_states, state_index, KF_X);
-    fdmpkt.position_xyz[2] = +physics_states_get_position_world(&flight_states->physics_states, state_index, KF_Y);
+    fdmpkt.position_xyz[0] = -state->position_world[KF_Z];
+    fdmpkt.position_xyz[1] = -state->position_world[KF_X];
+    fdmpkt.position_xyz[2] = +state->position_world[KF_Y];
 
-    fdmpkt.pressure = drone_states_get_barometer_pressure_pa(&flight_states->drone_states, state_index);
+    fdmpkt.pressure = state->barometer_pressure_pa;
     updateState(&fdmpkt);
     
-    uartDataIn(
-        0,
-        firmware_states_get_uart_data_in_configurator(&flight_states->firmware_states, state_index),
-        firmware_states_get_uart_data_in_size_configurator(&flight_states->firmware_states, state_index));
-    firmware_states_set_uart_data_in_configurator(&flight_states->firmware_states, state_index, NULL);
-    firmware_states_set_uart_data_in_size_configurator(&flight_states->firmware_states, state_index, 0);
+    uartDataIn(0, state->uart_data_in_configurator, state->uart_data_in_size_configurator);
+    state->uart_data_in_configurator = NULL;
+    state->uart_data_in_size_configurator = 0;
 
-    char cameraAngle = firmware_states_get_camera_angle_in(&flight_states->firmware_states, state_index);
+    char cameraAngle = state->camera_angle_in;
     if (cameraAngle != KF_INVALID_CAMERA_ANGLE) {
         rxConfigMutable()->fpvCamAngleDegrees = cameraAngle;
-    }
-
-    uint32_t reconcileSize = firmware_states_get_reconcile_in_out_size(&flight_states->firmware_states, state_index);
-    if (reconcileSize != 0) {
-        const char *reconcileData = flight_states->firmware_states.reconcile_in_out[state_index];
-        kf_reconcile_input(reconcileData, reconcileSize);
-        firmware_states_set_reconcile_in_out_size(&flight_states->firmware_states, state_index, 0);
     }
 
     for (uint32_t i = 0; i < iterations; ++i) {
@@ -970,33 +905,30 @@ KF_EXPORT void kf_iteration(const uint32_t iterations, const uint32_t flags, str
         outScale = 500.0;
     }
 
-    drone_states_set_motor_count(&flight_states->drone_states, state_index, (char)pwmRawPkt.motorCount);
+    state->motor_count = (char)pwmRawPkt.motorCount;
     for (uint32_t i = 0; i < pwmRawPkt.motorCount; ++i) {
-        drone_states_set_motor_outputs(&flight_states->drone_states, state_index, i,  motorsPwm[i] / outScale);
+        state->motor_outputs[i] = motorsPwm[i] / outScale;
     }
 
     if ((flags & KF_FLAGS_FINAL_ITERATION) != 0) {
-        firmware_states_set_camera_angle_out(&flight_states->firmware_states, state_index, (char)rxConfig()->fpvCamAngleDegrees);
-
-        uint32_t reconcileOutputSize = kf_reconcile_output(NULL, 0);
-        KF_ASSERT_FORMAT(reconcileOutputSize <= KF_RECONCILE_IN_OUT_MAX_SIZE, "Unexpected reconcile output size: %u", reconcileOutputSize);
-        char *reconcileData = flight_states->firmware_states.reconcile_in_out[state_index];
-        kf_reconcile_output(reconcileData, reconcileOutputSize);
-        firmware_states_set_reconcile_in_out_size(&flight_states->firmware_states, state_index, reconcileOutputSize);
+        state->camera_angle_out = (char)rxConfig()->fpvCamAngleDegrees;
+        state->stick_range = FLIGHT_MODE(ANGLE_MODE | HORIZON_MODE | ALT_HOLD_MODE | POS_HOLD_MODE | GPS_RESCUE_MODE)
+            ? KF_STICK_RANGE_FULL
+            : KF_STICK_RANGE_REDUCED;
 
         if (saveEEPROM) {
-            firmware_states_set_eeprom_out(&flight_states->firmware_states, state_index, eepromData);
-            firmware_states_set_eeprom_out_size(&flight_states->firmware_states, state_index, EEPROM_SIZE);
+            state->eeprom_out = eepromData;
+            state->eeprom_out_size = EEPROM_SIZE;
             saveEEPROM = false;
         }
 
-        firmware_states_set_reboot_request(&flight_states->firmware_states, state_index, (uint32_t)rebootRequest);
+        state->reboot_request = (char)rebootRequest;
         rebootRequest = (bootloaderRequestType_e)KF_REBOOT_REQUEST_NONE;
 
         for (int i = 0; i < KF_MAX_UART_CHANNELS; ++i) {
             uartBuffer* src = &uartBuffers[i];
-            firmware_states_set_uart_data_out(&flight_states->firmware_states, state_index, i, src->uartDataOut);
-            firmware_states_set_uart_data_out_size(&flight_states->firmware_states, state_index, i, src->uartDataSize);
+            state->uart_data_out[i] = src->uartDataOut;
+            state->uart_data_out_size[i] = src->uartDataSize;
             src->uartDataSize = 0;
         }
     }

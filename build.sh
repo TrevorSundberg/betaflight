@@ -12,5 +12,5 @@ docker buildx build --progress=plain --target windows -t betaflight_windows ./do
 docker run --rm -it --user 1000:1000 -v `pwd`:/src -e BUILD_TYPE="$BUILD_TYPE" -w /src betaflight_linux ./internal_linux.sh
 #docker run --rm -it --user 1000:1000 -v `pwd`:/src -e BUILD_TYPE="$BUILD_TYPE" -w /src betaflight_wasi ./internal_wasi.sh
 docker run --rm -it --user 1000:1000 -v `pwd`:/src -e BUILD_TYPE="$BUILD_TYPE" -w /src betaflight_windows ./internal_windows.sh
-cp build_linux/libbetaflight_SITL.so ../../Assets/Plugins
-cp build_windows/libbetaflight_SITL.dll ../../Assets/Plugins
+cp --remove-destination build_linux/libbetaflight_SITL.so ../../Assets/Plugins
+cp --remove-destination build_windows/libbetaflight_SITL.dll ../../Assets/Plugins
